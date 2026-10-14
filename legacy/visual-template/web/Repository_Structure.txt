@@ -1,0 +1,119 @@
+Meta_Intel_Technologies/
+├── README.md
+├── .gitignore
+├── .env.example
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+├── tailwind.config.ts
+├── postcss.config.js
+├── index.html
+│
+├── docs/
+│   ├── architecture.md
+│   └── database.md
+│
+├── supabase/
+│   ├── config.toml
+│   ├── migrations/
+│   │   ├── 0001_init_schema.sql
+│   │   ├── 0002_rls_policies.sql
+│   │   ├── 0003_audit_triggers.sql
+│   │   └── 0004_seed_demo.sql
+│   └── functions/
+│       └── audit-log/index.ts
+│
+└── src/
+    ├── main.tsx
+    ├── App.tsx
+    ├── index.css
+    │
+    ├── lib/
+    │   ├── supabase.ts
+    │   ├── env.ts
+    │   └── queryClient.ts
+    │
+    ├── types/
+    │   ├── database.ts
+    │   └── domain.ts
+    │
+    ├── integrations/
+    │   └── supabaseClient.ts
+    │
+    ├── hooks/
+    │   ├── useAuth.ts
+    │   ├── useProfile.ts
+    │   ├── usePermissions.ts
+    │   └── useToast.ts
+    │
+    ├── services/
+    │   ├── clients.service.ts
+    │   ├── campaigns.service.ts
+    │   ├── activities.service.ts
+    │   ├── personnel.service.ts
+    │   ├── teams.service.ts
+    │   ├── locations.service.ts
+    │   ├── assignments.service.ts
+    │   ├── dashboard.service.ts
+    │   └── audit.service.ts
+    │
+    ├── components/
+    │   ├── ui/
+    │   │   ├── Button.tsx
+    │   │   ├── Input.tsx
+    │   │   ├── Select.tsx
+    │   │   ├── Textarea.tsx
+    │   │   ├── Modal.tsx
+    │   │   ├── Table.tsx
+    │   │   ├── Badge.tsx
+    │   │   ├── Card.tsx
+    │   │   ├── EmptyState.tsx
+    │   │   ├── Skeleton.tsx
+    │   │   ├── Pagination.tsx
+    │   │   └── ConfirmDialog.tsx
+    │   ├── layout/
+    │   │   ├── AppShell.tsx
+    │   │   ├── Sidebar.tsx
+    │   │   ├── Topbar.tsx
+    │   │   └── ProtectedRoute.tsx
+    │   └── shared/
+    │       ├── PageHeader.tsx
+    │       └── DataTableToolbar.tsx
+    │
+    ├── features/
+    │   ├── auth/
+    │   │   ├── LoginPage.tsx
+    │   │   ├── ForgotPasswordPage.tsx
+    │   │   └── ResetPasswordPage.tsx
+    │   ├── dashboard/
+    │   │   └── DashboardPage.tsx
+    │   ├── clients/
+    │   │   ├── ClientsListPage.tsx
+    │   │   ├── ClientFormModal.tsx
+    │   │   └── ClientDetailPage.tsx
+    │   ├── campaigns/
+    │   │   ├── CampaignsListPage.tsx
+    │   │   ├── CampaignFormModal.tsx
+    │   │   └── CampaignDetailPage.tsx
+    │   ├── activities/
+    │   │   ├── ActivitiesListPage.tsx
+    │   │   └── ActivityFormModal.tsx
+    │   ├── personnel/
+    │   │   ├── PersonnelListPage.tsx
+    │   │   └── PersonnelFormModal.tsx
+    │   ├── teams/
+    │   │   ├── TeamsListPage.tsx
+    │   │   └── TeamFormModal.tsx
+    │   ├── locations/
+    │   │   ├── LocationsListPage.tsx
+    │   │   └── LocationFormModal.tsx
+    │   ├── assignments/
+    │   │   ├── AssignmentsListPage.tsx
+    │   │   └── AssignmentFormModal.tsx
+    │   └── settings/
+    │       └── SettingsPage.tsx
+    │
+    └── utils/
+        ├── format.ts
+        ├── validation.ts
+        └── constants.ts

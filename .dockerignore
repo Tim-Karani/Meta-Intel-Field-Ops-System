@@ -1,0 +1,8 @@
+.git
+legacy
+docs
+mobile
+**/node_modules
+backend/vendor
+backend/tests
+backend/.env

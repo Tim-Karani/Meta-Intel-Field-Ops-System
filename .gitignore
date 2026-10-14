@@ -1,0 +1,19 @@
+# secrets and local state
+.env
+.env.*
+!.env.example
+backend/vendor/
+backend/storage/logs/*
+backend/storage/app/private/*
+!backend/storage/app/private/.gitignore
+backend/bootstrap/cache/*
+!backend/bootstrap/cache/.gitignore
+node_modules/
+*.log
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+legacy/**/node_modules/
+mobile/**/build/
+mobile/**/.dart_tool/

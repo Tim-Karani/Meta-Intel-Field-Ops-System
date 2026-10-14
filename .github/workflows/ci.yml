@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push: { branches: [main] }
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend tests (PHPUnit on PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env: { POSTGRES_DB: field_ops_test, POSTGRES_USER: field_ops, POSTGRES_PASSWORD: ci-only-password }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U field_ops -d field_ops_test" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DB_CONNECTION: pgsql
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: field_ops_test
+      DB_USERNAME: field_ops
+      DB_PASSWORD: ci-only-password
+      APP_ENV: testing
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with: { php-version: '8.4', extensions: pdo_pgsql, gd, exif, intl, mbstring, zip, bcmath, coverage: none }
+      - uses: actions/cache@v4
+        with: { path: ~/.composer/cache, key: composer-${{ hashFiles('backend/composer.lock') }} }
+      - run: composer install --no-interaction --prefer-dist --no-progress
+      - run: cp .env.example .env && php artisan key:generate
+      - name: Lint
+        run: find app routes database tests config -name '*.php' -print0 | xargs -0 -n1 -P4 php -l > /dev/null
+      - name: Unit tests
+        run: php artisan test --testsuite=Unit
+      - name: Feature tests
+        run: php artisan test --testsuite=Feature
+      - name: Security tests
+        run: php artisan test --testsuite=Security
+
+  web:
+    name: Web static checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - name: Syntax-check every module
+        run: find web -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: No inline HTML sinks
+        run: "! grep -rnE 'innerHTML|outerHTML|insertAdjacentHTML|document\\.write|eval\\(' web/assets/js"
