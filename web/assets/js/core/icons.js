@@ -40,6 +40,7 @@ const P = {
   eye: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
   logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
   menu: 'M3 6h18M3 12h18M3 18h18',
+  filter: 'M22 3H2l8 9.5V19l4 2v-8.5L22 3z',
   chevronDown: 'M6 9l6 6 6-6', chevronRight: 'M9 6l6 6-6 6', chevronLeft: 'M15 6l-6 6 6 6', chevronUp: 'M18 15l-6-6-6 6',
   arrowUp: 'M12 19V5M5 12l7-7 7 7', arrowDown: 'M12 5v14M19 12l-7 7-7-7',
   more: 'M12 12h.01M19 12h.01M5 12h.01',

@@ -4,6 +4,7 @@ namespace App\Domain\Visits;
 
 use App\Domain\Audit\AuditService;
 use App\Domain\Forms\FormResponseValidator;
+use App\Domain\Locations\OutletService;
 use App\Domain\Notifications\NotificationService;
 use App\Enums\AssignmentStatus;
 use App\Enums\GpsOutcome;
@@ -29,7 +30,7 @@ use Illuminate\Validation\ValidationException;
  */
 class VisitService
 {
-    public function __construct(private FormResponseValidator $forms) {}
+    public function __construct(private FormResponseValidator $forms, private OutletService $outlets) {}
 
     /** Create (or return, when the same client_uuid was already received) a scheduled visit. */
     public function start(User $agent, Assignment $assignment, ?string $clientUuid = null, ?string $deviceId = null): Visit
@@ -73,6 +74,11 @@ class VisitService
         $visit->refresh();
         $this->assertStatus($visit, VisitStatus::Scheduled, 'check in');
 
+        $capturing = !$visit->location->isMapped();
+        if ($capturing) {
+            $this->assertCapturable($visit, $agent, $gps);
+        }
+
         $evaluation = $this->evaluate($visit, $agent, $gps, true, $offlineReplay);
 
         if ($evaluation->outcome === GpsOutcome::Rejected) {
@@ -92,12 +98,18 @@ class VisitService
                 'network_type' => $gps['network_type'] ?? null, 'app_version' => $gps['app_version'] ?? null,
             ]);
 
+            $mapped = $this->outlets->captureFromCheckIn($visit->location, $agent, $gps);
+
             $visit->update(['started_at' => now(), 'gps_outcome' => $evaluation->outcome, 'device_id' => $gps['device_id'] ?? $visit->device_id]);
             $this->move($visit, VisitStatus::Started, $agent, 'checked_in', $evaluation->outcome === GpsOutcome::Valid ? null : $evaluation->summary(), ['gps' => $evaluation->toArray()]);
 
             $assignment = $visit->assignment;
             if ($assignment->status !== AssignmentStatus::InProgress && $assignment->status->canMoveTo(AssignmentStatus::InProgress)) {
                 $assignment->update(['status' => AssignmentStatus::InProgress]);
+            }
+            if ($mapped) {
+                NotificationService::notify(NotificationService::visitReviewers($visit), 'location.geo_captured', 'Outlet position captured',
+                    "“{$visit->location->name}” was mapped from {$agent->name}'s check-in. Please confirm the position.", ['location_id' => $visit->location_id, 'visit_id' => $visit->id]);
             }
             if ($evaluation->outcome === GpsOutcome::Suspicious) {
                 NotificationService::notify(NotificationService::visitReviewers($visit), 'visit.gps_suspicious', 'Suspicious GPS check-in', $evaluation->summary(), ['visit_id' => $visit->id]);
@@ -285,6 +297,23 @@ class VisitService
         ];
     }
 
+    /** The reading becomes the outlet's position, so it must be a trustworthy fix. */
+    private function assertCapturable(Visit $visit, User $agent, array $gps): void
+    {
+        $max = (float) config('field.gps.capture_max_accuracy_m', 50);
+        $accuracy = isset($gps['accuracy_m']) ? (float) $gps['accuracy_m'] : null;
+        $problem = match (true) {
+            ($gps['mock_flag'] ?? null) === true => 'a mock location cannot be used to map an outlet',
+            $accuracy === null => 'the device did not report a GPS accuracy',
+            $accuracy > $max => sprintf('GPS accuracy is %.0f m; at least %.0f m is needed to map a new outlet', $accuracy, $max),
+            default => null,
+        };
+        if ($problem !== null) {
+            $this->event($visit, 'checkin_rejected', $visit->status, $visit->status, $agent, "Cannot map outlet: $problem.", ['submitted' => ['lat' => $gps['latitude'], 'lng' => $gps['longitude'], 'accuracy_m' => $accuracy]]);
+            throw new DomainRuleException("This outlet has no position yet, and {$problem}. Step outside or move to open sky, wait for a better fix and try again.", 'gps_rejected', 422);
+        }
+    }
+
     private function evaluate(Visit $visit, User $agent, array $gps, bool $isCheckin, bool $offlineReplay): GpsEvaluation
     {
         $location = $visit->location;
@@ -319,7 +348,11 @@ class VisitService
             ->map(fn ($c) => ['lat' => (float) $c->latitude, 'lng' => (float) $c->longitude])->all();
 
         return GpsValidator::make($overrides)->evaluate(
-            ['lat' => $location->latitude, 'lng' => $location->longitude, 'radius_m' => $location->geofence_radius_m],
+            // An unmapped outlet has no position to compare with: the reading becomes the position (distance 0),
+            // every other signal (accuracy, clock, travel, mock, device) is still judged.
+            $location->isMapped()
+                ? ['lat' => $location->latitude, 'lng' => $location->longitude, 'radius_m' => $location->geofence_radius_m]
+                : ['lat' => (float) $gps['latitude'], 'lng' => (float) $gps['longitude'], 'radius_m' => $location->geofence_radius_m],
             [
                 'lat' => (float) $gps['latitude'], 'lng' => (float) $gps['longitude'],
                 'accuracy_m' => isset($gps['accuracy_m']) ? (float) $gps['accuracy_m'] : null,

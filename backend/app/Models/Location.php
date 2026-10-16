@@ -31,6 +31,13 @@ class Location extends Model
         'status',
         'notes',
         'created_by',
+        'geo_source',
+        'geo_captured_at',
+        'geo_captured_by',
+        'geo_accuracy_m',
+        'needs_review',
+        'client_uuid',
+        'created_via',
     ];
 
     protected function casts(): array
@@ -39,7 +46,15 @@ class Location extends Model
             'latitude' => 'float',
             'longitude' => 'float',
             'geofence_radius_m' => 'integer',
+            'geo_accuracy_m' => 'float',
+            'geo_captured_at' => 'datetime',
+            'needs_review' => 'boolean',
         ];
+    }
+
+    public function isMapped(): bool
+    {
+        return $this->latitude !== null && $this->longitude !== null;
     }
 
     public function client(): BelongsTo

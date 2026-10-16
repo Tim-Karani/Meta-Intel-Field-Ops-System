@@ -20,6 +20,8 @@ Base URL `/api/v1`. All responses use the envelope `{ "success", "message", "dat
 | GET | `/notifications/unread-count` | `notifications.view` | NotificationController@unreadCount |
 | POST | `/notifications/read-all` | `notifications.view` | NotificationController@readAll |
 | POST | `/notifications/{id}/read` | `notifications.view` | NotificationController@read |
+| GET | `/sync/bootstrap` | `assignments.view` | SyncController@bootstrap |
+| GET | `/sync/changes` | `assignments.view` | SyncController@changes |
 | GET | `/dashboard` | `dashboard.view \| portal.view` | DashboardController |
 | GET | `/portal/summary` | `portal.view` | PortalController@summary |
 | GET | `/portal/campaigns` | `portal.view` | PortalController@campaigns |
@@ -155,6 +157,8 @@ Base URL `/api/v1`. All responses use the envelope `{ "success", "message", "dat
 | DELETE | `/routes/{id}` | `territories.manage` | RouteController@destroy |
 | GET | `/locations` | `locations.view` | LocationController@index |
 | GET | `/locations/{id}` | `locations.view` | LocationController@show |
+| POST | `/locations/field` | `locations.capture` | LocationController@storeInField — agent adds an outlet in the field (client UUIDs, idempotent) |
+| POST | `/locations/{id}/confirm-geo` | `locations.manage` | LocationController@confirmGeo — accept or correct a captured position |
 | POST | `/locations` | `locations.manage` | LocationController@store |
 | PATCH | `/locations/{id}` | `locations.manage` | LocationController@update |
 | PUT | `/locations/{id}` | `locations.manage` | LocationController@update |

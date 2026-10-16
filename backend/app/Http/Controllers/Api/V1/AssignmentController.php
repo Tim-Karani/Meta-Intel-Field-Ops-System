@@ -24,7 +24,7 @@ use Illuminate\Validation\Rule;
 class AssignmentController extends ResourceController
 {
     protected string $model = Assignment::class;
-    protected array $with = ['campaign:id,name,code', 'activity:id,name', 'agent:id,name', 'location:id,name,town,latitude,longitude,geofence_radius_m', 'supervisor:id,name'];
+    protected array $with = ['campaign:id,name,code', 'activity:id,name', 'agent:id,name', 'location:id,name,town,latitude,longitude,geofence_radius_m,needs_review,created_via', 'supervisor:id,name'];
     protected array $filters = ['campaign_id' => 'campaign_id', 'agent_id' => 'agent_id', 'status' => 'status', 'location_id' => 'location_id', 'activity_id' => 'activity_id', 'supervisor_id' => 'supervisor_id'];
     protected array $sortable = ['scheduled_date', 'status', 'created_at'];
     protected string $defaultSort = '-scheduled_date';

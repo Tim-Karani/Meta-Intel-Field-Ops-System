@@ -7,7 +7,7 @@ import { badge, openModal, confirmDialog, toast, toastError, empty } from './fee
 import { osmLink } from './map.js';
 
 /** Images need the bearer token, so they are fetched as blobs and revoked when the node leaves the page. */
-function secureImage(photo, { alt = 'Evidence photo', cls = '' } = {}) {
+export function secureImage(photo, { alt = 'Evidence photo', cls = '' } = {}) {
   const img = h('img', { alt, class: cls, loading: 'lazy' });
   const holder = h('div', { class: 'thumb-loading' }, h('div', { class: 'spinner' }));
   let url = null;

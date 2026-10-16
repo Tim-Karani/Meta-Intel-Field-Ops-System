@@ -1,11 +1,12 @@
 # Field Operations & Retail Execution Platform
 
-Web side (Laravel 12 API + vanilla HTML/CSS/JS admin app). The Flutter mobile app for field agents is the next phase.
+Web side (Laravel 12 API + vanilla HTML/CSS/JS admin app) and the Flutter mobile app for field agents (`mobile/`).
 
 | Path | What it is |
 |---|---|
 | `backend/` | Laravel 12 / PHP 8.4 / PostgreSQL REST API (`/api/v1`) |
 | `web/` | Static web app (no build step, strict CSP, no inline script or style) |
+| `mobile/` | Flutter app for field agents, offline-first (see `mobile/README.md`) |
 | `docker/`, `docker-compose.yml` | PHP-FPM image, nginx (serves `web/`, proxies `/api`), Postgres, queue worker, scheduler |
 | `docs/` | Architecture, data model, RBAC, security, deployment, testing, decisions, API reference |
 | `legacy/` | The original visual template (React/Supabase), kept for reference only |
@@ -36,4 +37,6 @@ against a real database yet.** Run `composer install && php artisan test` first 
 ## Docs
 [Architecture](docs/ARCHITECTURE.md) · [Data model](docs/DATA_MODEL.md) · [RBAC](docs/RBAC.md) ·
 [Security](docs/SECURITY.md) · [Web app](docs/WEB_APP.md) · [Deployment](docs/DEPLOYMENT.md) ·
-[Testing](docs/TESTING.md) · [Decisions](docs/DECISIONS.md) · [API reference](docs/API_REFERENCE.md)
+[Testing](docs/TESTING.md) · [Decisions](docs/DECISIONS.md) · [API reference](docs/API_REFERENCE.md) · [Mobile & sync](docs/MOBILE_APP.md)
+
+- Outlets without coordinates and field-added outlets: [docs/OUTLETS.md](docs/OUTLETS.md)

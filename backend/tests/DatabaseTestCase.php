@@ -20,6 +20,13 @@ abstract class DatabaseTestCase extends TestCase
 
     protected function api(string $method, string $uri, array $data = [], array $headers = []): \Illuminate\Testing\TestResponse
     {
-        return $this->json($method, '/api/v1/'.ltrim($uri, '/'), $data, $headers);
+        $url = '/api/v1/'.ltrim($uri, '/');
+        if (strtoupper($method) === 'GET' && $data !== []) {
+            // GET parameters belong in the query string; json() would put them in the body, where $request->query() cannot see them.
+            $url .= (str_contains($url, '?') ? '&' : '?').http_build_query($data);
+            $data = [];
+        }
+
+        return $this->json($method, $url, $data, $headers);
     }
 }

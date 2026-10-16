@@ -37,6 +37,12 @@ Route::prefix('v1')->group(function () {
             Route::post('notifications/{id}/read', [V1\NotificationController::class, 'read']);
         });
 
+        // Mobile offline sync (read side; writes use the idempotent endpoints with client_uuid)
+        Route::middleware('permission:assignments.view')->prefix('sync')->group(function () {
+            Route::get('bootstrap', [V1\SyncController::class, 'bootstrap']);
+            Route::get('changes', [V1\SyncController::class, 'changes']);
+        });
+
         Route::get('dashboard', V1\DashboardController::class)->middleware('permission:dashboard.view,portal.view');
 
         // ---- client portal ----
@@ -130,6 +136,8 @@ Route::prefix('v1')->group(function () {
         });
 
         // ---- teams / territories / routes / locations ----
+        Route::post('locations/field', [V1\LocationController::class, 'storeInField'])->middleware('permission:locations.capture');
+        Route::post('locations/{id}/confirm-geo', [V1\LocationController::class, 'confirmGeo'])->middleware('permission:locations.manage');
         foreach ([
             ['teams', V1\TeamController::class, 'teams.view', 'teams.manage'],
             ['territories', V1\TerritoryController::class, 'territories.view', 'territories.manage'],

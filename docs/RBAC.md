@@ -1,6 +1,6 @@
 # RBAC
 
-Seven roles, 58 permission slugs. Routes are guarded by `permission:` middleware (any-of), objects by Policies,
+Seven roles, 59 permission slugs. Routes are guarded by `permission:` middleware (any-of), objects by Policies,
 and **rows** by `AccessScope`: a record outside your scope returns **404**, indistinguishable from a missing one.
 Roles and grants are seeded by `RolePermissionSeeder`; the matrix below is generated from it.
 
@@ -42,6 +42,7 @@ Roles and grants are seeded by `RolePermissionSeeder`; the matrix below is gener
 | `territories.manage` | ● | ● | · | · | · | · | · |
 | `locations.view` | ● | ● | ● | ● | ● | ● | · |
 | `locations.manage` | ● | ● | ● | · | · | · | · |
+| `locations.capture` | ● | · | · | · | · | ● | · |
 | `products.view` | ● | ● | ● | ● | ● | ● | · |
 | `products.manage` | ● | ● | ● | · | · | · | · |
 | `forms.view` | ● | ● | ● | ● | ● | ● | · |

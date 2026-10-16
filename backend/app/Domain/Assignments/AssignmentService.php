@@ -56,6 +56,44 @@ class AssignmentService
         });
     }
 
+    /**
+     * A same-day assignment an agent creates for themselves when adding an outlet in the field. The client may supply
+     * the id (offline-created); replays return the existing row. Skips the overlap and future-date checks that
+     * apply to office planning.
+     *
+     * @param array<string,mixed> $data
+     */
+    public function createForField(array $data, User $agent): Assignment
+    {
+        if (!empty($data['id']) && ($existing = Assignment::query()->find($data['id']))) {
+            if ($existing->agent_id !== $agent->getKey()) {
+                throw new DomainRuleException('This assignment id is already in use.', 'conflict', 409);
+            }
+            return $existing;
+        }
+
+        $campaign = Campaign::query()->findOrFail($data['campaign_id']);
+        $activity = null;
+        if (!empty($data['activity_id'])) {
+            $activity = Activity::query()->where('campaign_id', $campaign->id)->find($data['activity_id']);
+        }
+        $formId = $activity?->form_id
+            ?? DB::table('campaign_forms')->join('forms', 'forms.id', '=', 'campaign_forms.form_id')
+                ->where('campaign_forms.campaign_id', $campaign->id)->where('forms.status', 'published')
+                ->orderByDesc('forms.version')->value('forms.id');
+
+        $assignment = new Assignment();
+        $assignment->forceFill(array_filter([
+            'id' => $data['id'] ?? null,
+            'campaign_id' => $campaign->id, 'activity_id' => $activity?->id, 'agent_id' => $agent->getKey(), 'location_id' => $data['location_id'],
+            'supervisor_id' => DB::table('agent_profiles')->where('user_id', $agent->getKey())->value('supervisor_id'), 'form_id' => $formId,
+            'scheduled_date' => $data['scheduled_date'], 'status' => AssignmentStatus::Accepted, 'accepted_at' => now(), 'created_by' => $agent->getKey(),
+            'instructions' => 'Added in the field by the agent.',
+        ], fn ($v) => $v !== null))->save();
+
+        return $assignment;
+    }
+
     public function transition(Assignment $assignment, AssignmentStatus $to, User $actor, ?string $reason = null): Assignment
     {
         if (!$assignment->status->canMoveTo($to)) {

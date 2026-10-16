@@ -14,7 +14,7 @@ const unproject = (x, y, z) => {
 };
 const metersPerPixel = (lat, z) => (156543.03392 * Math.cos((lat * Math.PI) / 180)) / 2 ** z;
 
-const COLORS = { valid: '#16a34a', warning: '#f59e0b', suspicious: '#dc2626', rejected: '#7f1d1d', default: '#1ba4a8', selected: '#3a5a96' };
+const COLORS = { valid: '#16a34a', warning: '#f59e0b', suspicious: '#dc2626', rejected: '#7f1d1d', default: '#e8920c', selected: '#3a5a96' };
 
 /**
  * markers: [{ lat, lng, label, tone, onClick, radiusM }]   radiusM draws a geofence circle.
@@ -64,7 +64,7 @@ export function mapView({ markers = [], height = 380, zoom, center, interactive 
       const p = toScreen(m.lat, m.lng);
       if (p.x < -40 || p.y < -40 || p.x > w + 40 || p.y > hh + 40) continue;
       if (m.radiusM) {
-        overlay.append(svg('circle', { cx: p.x, cy: p.y, r: Math.max(4, m.radiusM / metersPerPixel(m.lat, view.z)), fill: 'rgba(27,164,168,.15)', stroke: '#1ba4a8', 'stroke-width': 1.5, 'stroke-dasharray': '4 3' }));
+        overlay.append(svg('circle', { cx: p.x, cy: p.y, r: Math.max(4, m.radiusM / metersPerPixel(m.lat, view.z)), fill: 'rgba(232,146,12,.15)', stroke: '#e8920c', 'stroke-width': 1.5, 'stroke-dasharray': '4 3' }));
       }
       const color = COLORS[m.tone] || COLORS.default;
       const pin = h('div', { class: 'marker', style: { left: `${p.x}px`, top: `${p.y}px`, cursor: m.onClick ? 'pointer' : 'default' }, tabindex: m.onClick ? 0 : null, role: m.onClick ? 'button' : null, 'aria-label': m.label || 'Location' });

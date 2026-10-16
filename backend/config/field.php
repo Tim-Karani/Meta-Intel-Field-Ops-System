@@ -16,6 +16,8 @@ return [
     ],
     // Default GPS rules; overridable per campaign via gps_rules.config. See App\Domain\Visits\GpsValidator.
     'gps' => [
+        // Capturing an outlet's position (first visit / field-added) demands a good fix.
+        'capture_max_accuracy_m' => 50,
         'default_radius_m' => 100, 'accuracy_poor_m' => 100, 'accuracy_unusable_m' => 500, 'accuracy_credit_cap_m' => 100,
         'near_multiplier' => 2.0, 'far_distance_m' => 1000, 'far_action' => 'reject',
         'skew_warn_s' => 300, 'skew_suspicious_s' => 3600, 'max_speed_kmh' => 200, 'travel_window_h' => 12, 'suspicious_threshold' => 3,

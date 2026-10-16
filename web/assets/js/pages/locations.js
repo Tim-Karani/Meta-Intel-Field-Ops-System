@@ -7,6 +7,11 @@ import { href, navigate } from '../core/router.js';
 import { titleCase } from '../core/format.js';
 import { mapView } from '../ui/map.js';
 
+const SOURCE = { manual: 'Entered by the office', first_visit: 'Captured at first visit', field_added: 'Captured when added in the field' };
+export const geoSource = (src) => SOURCE[src] || '—';
+/** Mapped / awaiting-confirmation / not-mapped status of an outlet's position. */
+export const positionBadge = (r) => (r.latitude == null ? badge('not mapped', { tone: 'warn' }) : r.needs_review ? badge('confirm position', { tone: 'info' }) : badge('mapped', { tone: 'ok' }));
+
 export const locationFields = (territories, clients, types) => [
   { name: 'name', label: 'Location name', required: true },
   { name: 'code', label: 'Code', maxlength: 40 },
@@ -15,8 +20,8 @@ export const locationFields = (territories, clients, types) => [
   { name: 'territory_id', label: 'Territory', type: 'select', options: territories },
   { name: 'county', label: 'County' }, { name: 'town', label: 'Town' },
   { name: 'address', label: 'Address', full: true },
-  { name: 'latitude', label: 'Latitude', type: 'decimal', required: true, min: -90, max: 90, help: 'Decimal degrees, e.g. -1.2921.' },
-  { name: 'longitude', label: 'Longitude', type: 'decimal', required: true, min: -180, max: 180, help: 'Decimal degrees, e.g. 36.8219.' },
+  { name: 'latitude', label: 'Latitude', type: 'decimal', min: -90, max: 90, help: 'Optional. Leave latitude and longitude empty and the position is captured when an agent first starts a visit here.' },
+  { name: 'longitude', label: 'Longitude', type: 'decimal', min: -180, max: 180, help: 'Both or neither. Decimal degrees, e.g. 36.8219.' },
   { name: 'geofence_radius_m', label: 'Geofence radius (m)', type: 'number', min: 10, max: 5000, value: 100, help: 'Check-ins within this distance count as on-site.' },
   { name: 'opening_hours', label: 'Opening hours' },
   { name: 'contact_name', label: 'Contact name' }, { name: 'contact_phone', label: 'Contact phone' },
@@ -32,12 +37,13 @@ export default async function render({ container }) {
     perms: { create: 'locations.manage', edit: 'locations.manage', delete: 'locations.manage' }, defaultSort: 'name', searchPlaceholder: 'Search name, town, county, code…',
     fields: () => locationFields(territories, clients, types),
     toPayload: (v) => { const o = { ...v }; if (o.geofence_radius_m === null) delete o.geofence_radius_m; if (!o.type) delete o.type; return o; },
-    filters: [{ key: 'territory_id', label: 'All territories', options: territories }, { key: 'type', label: 'All types', options: types }, { key: 'status', label: 'All statuses', options: ['active', 'inactive'] }],
+    filters: [{ key: 'geo', label: 'Any position', options: [{ id: 'unmapped', name: 'Not mapped yet' }, { id: 'review', name: 'Needs confirmation' }, { id: 'mapped', name: 'Mapped' }] }, { key: 'territory_id', label: 'All territories', options: territories }, { key: 'type', label: 'All types', options: types }, { key: 'status', label: 'All statuses', options: ['active', 'inactive'] }],
     columns: [
       { key: 'name', label: 'Location', sort: 'name', render: (r) => h('div', null, h('a', { href: href(`/locations/${r.id}`) }, h('strong', null, r.name)), r.code && h('div', { class: 'small muted mono' }, r.code)) },
       { key: 'type', label: 'Type', render: (r) => titleCase(r.type) },
       { key: 'town', label: 'Town / county', sort: 'town', render: (r) => [r.town, r.county].filter(Boolean).join(', ') || '—' },
       { key: 'territory', label: 'Territory', render: (r) => r.territory?.name || '—' },
+      { key: 'position', label: 'Position', render: (r) => positionBadge(r) },
       { key: 'geofence', label: 'Geofence', align: 'right', render: (r) => `${r.geofence_radius_m ?? 100} m` },
       { key: 'status', label: 'Status', render: (r) => badge(r.status) },
     ],

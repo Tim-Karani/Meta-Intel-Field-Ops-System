@@ -2,7 +2,7 @@ import { svg, h } from '../core/dom.js';
 import { fmtNumber } from '../core/format.js';
 
 /* Dependency-free SVG charts. All values come from API data; labels are inserted as text nodes. */
-export const PALETTE = ['#1ba4a8', '#3a5a96', '#f59e0b', '#ef4444', '#8b5cf6', '#10b981', '#64748b', '#ec4899'];
+export const PALETTE = ['#e8920c', '#3a5a96', '#10b981', '#ef4444', '#8b5cf6', '#0ea5e9', '#64748b', '#ec4899'];
 
 const niceMax = (v) => {
   if (v <= 0) return 1;

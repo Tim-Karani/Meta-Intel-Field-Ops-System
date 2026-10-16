@@ -14,7 +14,7 @@ final class Permissions
         'roles' => ['roles.view'],
         'teams' => ['teams.view', 'teams.manage'],
         'territories' => ['territories.view', 'territories.manage'],
-        'locations' => ['locations.view', 'locations.manage'],
+        'locations' => ['locations.view', 'locations.manage', 'locations.capture'],
         'products' => ['products.view', 'products.manage'],
         'forms' => ['forms.view', 'forms.manage'],
         'assignments' => ['assignments.view', 'assignments.create', 'assignments.edit', 'assignments.respond'],
@@ -68,7 +68,7 @@ final class Permissions
             Role::Analyst => $merge($viewAll, ['reports.export']),
             Role::FieldAgent => [
                 'assignments.view', 'assignments.respond', 'attendance.view', 'attendance.create', 'visits.view', 'visits.create', 'visits.edit',
-                'visits.submit', 'evidence.view', 'evidence.upload', 'issues.view', 'issues.create', 'locations.view', 'forms.view', 'products.view',
+                'visits.submit', 'evidence.view', 'evidence.upload', 'issues.view', 'issues.create', 'locations.view', 'locations.capture', 'forms.view', 'products.view',
                 'notifications.view', 'dashboard.view',
             ],
             Role::ClientUser => ['portal.view', 'notifications.view'],
