@@ -117,4 +117,53 @@ class AssignmentView {
   bool get isCancelled => status == 'cancelled';
   bool get isDone => status == 'completed';
   bool get needsAccept => status == 'pending';
+
+  /// Where the visit came from: 'journey_plan' (fixed plan), 'field' (added by the agent) or 'office'.
+  String get source => raw.str('source') ?? 'office';
+
+  /// The project's rules (from its template, tuned per campaign). Missing = the permissive defaults.
+  ProjectRules get rules => ProjectRules.from(raw.obj('campaign')?.obj('settings'));
+}
+
+/// What a project asks of the agent on a visit. Mirrors the server's ProjectSettings.
+class ProjectRules {
+  const ProjectRules({this.tasks = const {}, this.minPhotos = 0, this.visitLabel = 'Visit', this.outletAdders = 'all', this.visitPhotos = true});
+
+  final Map<String, bool> tasks;
+  final int minPhotos;
+  final String visitLabel;
+  final String outletAdders;
+
+  /// Check-in and check-out photos are required (they prove the assigned agent is the one at the outlet).
+  final bool visitPhotos;
+
+  factory ProjectRules.from(Map<String, dynamic>? s) {
+    if (s == null) return const ProjectRules();
+    final t = s.obj('tasks') ?? const <String, dynamic>{};
+    return ProjectRules(
+      tasks: {for (final k in const ['form', 'sales', 'osa', 'merchandising', 'photos']) k: t[k] != false},
+      minPhotos: s.integer('min_photos') ?? 0,
+      visitLabel: (s.str('visit_label') ?? '').trim().isEmpty ? 'Visit' : s.str('visit_label')!.trim(),
+      outletAdders: s.str('outlet_adders') ?? 'all',
+      visitPhotos: s['visit_photos'] != false,
+    );
+  }
+
+  bool taskOn(String key) => tasks[key] ?? true;
+}
+
+/// A campaign the agent may work in, with whether THEY may add outlets to it (the server decides; this is only shown).
+class OutletCampaign {
+  OutletCampaign(this.raw);
+  final Map<String, dynamic> raw;
+
+  String get id => raw.str('id') ?? '';
+  String get name => raw.str('name') ?? 'Campaign';
+  String? get clientName => raw.obj('client')?.str('name');
+  String? get formId => raw.str('form_id');
+  String? get activityId => raw.str('activity_id');
+  bool get canAdd => raw['can_add_outlet'] == true;
+  String? get denial => raw.str('add_outlet_denial');
+  ProjectRules get rules => ProjectRules.from(raw.obj('settings'));
+  String get defaultType => raw.obj('settings')?.str('outlet_type') ?? 'retail_store';
 }

@@ -39,7 +39,7 @@ class _AddOutletPageState extends ConsumerState<AddOutletPage> {
   String _type = 'retail_store';
   String? _campaignId;
   bool _saving = false;
-  late final Future<List<AssignmentView>> _campaigns = ref.read(repoProvider).outletCampaigns();
+  late final Future<List<OutletCampaign>> _campaigns = ref.read(repoProvider).outletCampaigns();
 
   @override
   void dispose() {
@@ -49,13 +49,13 @@ class _AddOutletPageState extends ConsumerState<AddOutletPage> {
     super.dispose();
   }
 
-  Future<void> _save(List<AssignmentView> options) async {
+  Future<void> _save(List<OutletCampaign> options) async {
     if (!(_form.currentState?.validate() ?? false)) return;
-    final sibling = options.firstWhere((a) => a.campaignId == _campaignId, orElse: () => options.first);
+    final campaign = options.firstWhere((a) => a.id == _campaignId, orElse: () => options.first);
     setState(() => _saving = true);
     try {
       final visitId = await ref.read(repoProvider).createOutlet(
-            sibling: sibling,
+            campaign: campaign,
             name: _name.text,
             type: _type,
             town: _town.text,
@@ -79,20 +79,35 @@ class _AddOutletPageState extends ConsumerState<AddOutletPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (!ref.watch(sessionProvider).can('locations.capture')) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Add outlet')),
+        body: const EmptyState(
+            icon: Icons.lock_outline,
+            title: 'Not allowed to add outlets',
+            message: 'Your account does not have the "Add outlets in the field" permission. Ask your supervisor or administrator to enable it, then sync.'),
+      );
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('Add outlet')),
-      body: FutureBuilder<List<AssignmentView>>(
+      body: FutureBuilder<List<OutletCampaign>>(
         future: _campaigns,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator());
-          final options = snap.data ?? const <AssignmentView>[];
+          final all = snap.data ?? const <OutletCampaign>[];
+          final options = all.where((c) => c.canAdd).toList();
           if (options.isEmpty) {
-            return const EmptyState(
+            return EmptyState(
                 icon: Icons.storefront_outlined,
-                title: 'No campaign to add to',
-                message: 'You can add outlets to campaigns you are assigned to. Sync to download your assignments, then try again.');
+                title: all.isEmpty ? 'No campaign yet' : 'You cannot add outlets here',
+                message: all.isEmpty
+                    ? 'You are not part of any campaign yet. Sync to download your campaigns, or ask your supervisor to add you.'
+                    : (all.first.denial ?? 'None of your projects allow adding outlets in the field.'));
           }
-          _campaignId ??= options.first.campaignId;
+          if (_campaignId == null) {
+            _campaignId = options.first.id;
+            _type = _types.containsKey(options.first.defaultType) ? options.first.defaultType : 'retail_store';
+          }
           return Form(
             key: _form,
             child: ListView(padding: const EdgeInsets.all(16), children: [
@@ -111,8 +126,12 @@ class _AddOutletPageState extends ConsumerState<AddOutletPage> {
                 value: _campaignId,
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Campaign'),
-                items: [for (final a in options) DropdownMenuItem(value: a.campaignId, child: Text(a.campaignName, overflow: TextOverflow.ellipsis))],
-                onChanged: (v) => setState(() => _campaignId = v),
+                items: [for (final a in options) DropdownMenuItem(value: a.id, child: Text(a.name, overflow: TextOverflow.ellipsis))],
+                onChanged: (v) => setState(() {
+                  _campaignId = v;
+                  final c = options.where((x) => x.id == v);
+                  if (c.isNotEmpty && _types.containsKey(c.first.defaultType)) _type = c.first.defaultType;
+                }),
               ),
               const SizedBox(height: 12),
               TextFormField(

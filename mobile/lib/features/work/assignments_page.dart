@@ -27,7 +27,9 @@ class _AssignmentsPageState extends ConsumerState<AssignmentsPage> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('My work')),
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: (!ref.watch(sessionProvider).can('locations.capture') || (ref.watch(outletCampaignsProvider).valueOrNull ?? const []).isEmpty)
+          ? null
+          : FloatingActionButton.extended(
         onPressed: () => context.push('/outlet/new'),
         icon: const Icon(Icons.add_business_outlined),
         label: const Text('Add outlet'),
@@ -111,6 +113,8 @@ class AssignmentCard extends StatelessWidget {
           if (a.startTime != null) _Meta(Icons.schedule, '${fmtTime(a.startTime)}${a.endTime != null ? ' - ${fmtTime(a.endTime)}' : ''}'),
           if (a.town != null) _Meta(Icons.place_outlined, a.town!),
           if (a.activityName != null) _Meta(Icons.bolt, a.activityName!),
+          if (a.source == 'journey_plan') _Meta(Icons.repeat, 'Journey plan'),
+          if (a.source == 'field') _Meta(Icons.add_location_alt_outlined, 'Added by you'),
         ]),
         if (a.removed) ...[
           const SizedBox(height: 8),

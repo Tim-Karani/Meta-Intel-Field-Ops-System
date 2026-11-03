@@ -51,17 +51,29 @@ class AccessScope
             'campaigns' => DB::table('campaign_users')->where('user_id', $id)->select('campaign_id'),
             'team' => DB::table('campaign_users')->where('user_id', $id)->select('campaign_id')
                 ->union(DB::table('campaign_teams as ct')->join('teams as t', 't.id', '=', 'ct.team_id')->where('t.supervisor_id', $id)->select('ct.campaign_id'))
-                ->union(DB::table('assignments')->where('supervisor_id', $id)->select('campaign_id')),
+                ->union(DB::table('assignments')->where('supervisor_id', $id)->select('campaign_id'))
+                ->union(DB::table('assignments')->whereIn('agent_id', self::supervisedAgentIds($user))->select('campaign_id'))
+                ->union(DB::table('assignments')->where('agent_id', $id)->select('campaign_id')),   // a Team Leader's own outlet work
             'own' => DB::table('assignments')->where('agent_id', $id)->select('campaign_id'),
             'client' => DB::table('campaigns')->where('client_id', $user->client_id)->whereNull('deleted_at')->select('id as campaign_id'),
             default => DB::table('campaigns')->whereRaw('1 = 0')->select('id as campaign_id'),
         };
     }
 
-    /** Agents (user ids) supervised by this user through agent_profiles or supervised teams. */
+    /**
+     * People (user ids) this user is responsible for.
+     *   Team Leader: agents whose team_leader_id is them (one region / smaller team).
+     *   Supervisor : agents they supervise directly, their Team Leaders, and every agent under those Team Leaders (all regions).
+     * Plus members of any team they supervise.
+     */
     public static function supervisedAgentIds(User $user): QueryBuilder
     {
-        return DB::table('agent_profiles')->where('supervisor_id', $user->getKey())->select('user_id')
+        $me = $user->getKey();
+
+        return DB::table('agent_profiles')->where(fn ($w) => $w
+            ->where('supervisor_id', $me)
+            ->orWhere('team_leader_id', $me)
+            ->orWhereIn('team_leader_id', DB::table('agent_profiles as tl')->where('tl.supervisor_id', $me)->select('tl.user_id')))->select('user_id')
             ->union(DB::table('team_members as tm')->join('teams as t', 't.id', '=', 'tm.team_id')->where('t.supervisor_id', $user->getKey())->select('tm.user_id'));
     }
 
@@ -102,6 +114,21 @@ class AccessScope
     {
         $ids = self::campaignIds($user);
         return $ids === null ? $q : $q->whereIn('campaigns.id', $ids);
+    }
+
+    public static function forProjectTemplate(Builder $q, User $user): Builder
+    {
+        return self::isInternal($user) ? $q : self::none($q);
+    }
+
+    public static function forJourneyPlan(Builder $q, User $user): Builder
+    {
+        return match ($user->scopeType()) {
+            'all' => $q,
+            'campaigns' => self::byCampaign($q, $user),
+            'team' => self::byCampaign($q, $user)->whereIn('journey_plans.agent_id', self::supervisedAgentIds($user)),
+            default => self::none($q),
+        };
     }
 
     public static function forActivity(Builder $q, User $user): Builder
@@ -166,6 +193,36 @@ class AccessScope
         };
     }
 
+    public static function forOutletType(Builder $q, User $user): Builder
+    {
+        return self::isInternal($user) || $user->scopeType() === 'own' ? $q : self::none($q);
+    }
+
+    public static function forOutletSubtype(Builder $q, User $user): Builder
+    {
+        return self::isInternal($user) || $user->scopeType() === 'own' ? $q : self::none($q);
+    }
+
+    public static function forOutletStatus(Builder $q, User $user): Builder
+    {
+        return self::isInternal($user) || $user->scopeType() === 'own' ? $q : self::none($q);
+    }
+
+    public static function forDistributor(Builder $q, User $user): Builder
+    {
+        return self::isInternal($user) || $user->scopeType() === 'own' ? $q : self::none($q);
+    }
+
+    public static function forGeoArea(Builder $q, User $user): Builder
+    {
+        return self::isInternal($user) || $user->scopeType() === 'own' ? $q : self::none($q);
+    }
+
+    public static function forChannel(Builder $q, User $user): Builder
+    {
+        return self::isInternal($user) || $user->scopeType() === 'own' ? $q : self::none($q);
+    }
+
     public static function forProductCategory(Builder $q, User $user): Builder
     {
         return self::isInternal($user) || $user->scopeType() === 'own' ? $q : self::none($q);
@@ -203,7 +260,7 @@ class AccessScope
             'all' => $q,
             'campaigns' => self::byCampaign($q, $user),
             'team' => self::byCampaign($q, $user)->where(fn ($w) => $w
-                ->whereIn('assignments.agent_id', self::supervisedAgentIds($user))->orWhere('assignments.supervisor_id', $user->getKey())),
+                ->whereIn('assignments.agent_id', self::supervisedAgentIds($user))->orWhere('assignments.supervisor_id', $user->getKey())->orWhere('assignments.agent_id', $user->getKey())),
             'own' => $q->where('assignments.agent_id', $user->getKey()),
             default => self::none($q),
         };
@@ -216,6 +273,7 @@ class AccessScope
             'campaigns' => self::byCampaign($q, $user),
             'team' => self::byCampaign($q, $user)->where(fn ($w) => $w
                 ->whereIn('visits.agent_id', self::supervisedAgentIds($user))
+                ->orWhere('visits.agent_id', $user->getKey())
                 ->orWhereIn('visits.assignment_id', DB::table('assignments')->where('supervisor_id', $user->getKey())->select('id'))),
             'own' => $q->where('visits.agent_id', $user->getKey()),
             // Client users only ever see APPROVED visits of their own client.
@@ -250,7 +308,7 @@ class AccessScope
         return match ($user->scopeType()) {
             'all' => $q,
             'campaigns' => $q->whereIn('attendance.user_id', DB::table('assignments')->whereIn('campaign_id', self::campaignIds($user))->select('agent_id')),
-            'team' => $q->whereIn('attendance.user_id', self::supervisedAgentIds($user)),
+            'team' => $q->where(fn ($w) => $w->whereIn('attendance.user_id', self::supervisedAgentIds($user))->orWhere('attendance.user_id', $user->getKey())),
             'own' => $q->where('attendance.user_id', $user->getKey()),
             default => self::none($q),
         };

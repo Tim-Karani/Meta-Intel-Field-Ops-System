@@ -59,3 +59,17 @@ step that fails permanently (FAILED / CONFLICT) blocks only **that visit's** lat
 
 ## Outlets without coordinates / adding outlets
 See [OUTLETS.md](OUTLETS.md). On the phone: **My work -> Add outlet**, then *Start outlet & save its location* on the visit screen.
+
+## Evidence, permissions and sync honesty (v1.1)
+
+* **Photos are camera-only.** There is no gallery option. The app also rejects a camera file that was not written in the last
+  3 minutes, labels every upload `source=camera`, and the server refuses evidence without that label, photos claiming to be
+  older than 3 days, and (already) an image fingerprint reused on another visit.
+* **Permissions are explained up front.** The sign-in payload carries the account's permissions; "Add outlet" is hidden/explained
+  when `locations.capture` is missing. `migrate` now also installs any permission the code defines
+  (`2026_01_01_000006_sync_permissions`), so a release can no longer ship a permission the database lacks.
+* **A refused step locks the visit.** If the server refuses the outlet or the visit itself, a red banner explains why in plain
+  language and the visit accepts no more work until the agent retries or discards the outlet. Other refused steps (e.g. a photo)
+  show the banner but leave the visit editable so the agent can fix them.
+* **"Submitted" means saved on the phone.** The visit header says *Saved on this phone - N changes not at the server yet*, or
+  *Received by the server* once everything has synced. A visit with refused items cannot be submitted.

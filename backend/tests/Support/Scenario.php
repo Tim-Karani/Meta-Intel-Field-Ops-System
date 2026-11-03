@@ -61,7 +61,7 @@ class Scenario
         $s->analyst = self::user('Analyst', RoleEnum::Analyst);
         $s->agent = self::user('Agent One', RoleEnum::FieldAgent);
         $s->otherAgent = self::user('Agent Two', RoleEnum::FieldAgent);
-        AgentProfile::query()->create(['user_id' => $s->agent->id, 'supervisor_id' => $s->supervisor->id, 'agent_type' => 'merchandiser']);
+        AgentProfile::query()->create(['user_id' => $s->agent->id, 'supervisor_id' => $s->supervisor->id, 'agent_type' => 'merchandiser', 'can_add_outlets' => true]);
         AgentProfile::query()->create(['user_id' => $s->otherAgent->id, 'agent_type' => 'promoter']);
 
         $s->clientA = Client::query()->create(['name' => 'Client A', 'code' => 'CA']);
@@ -127,7 +127,7 @@ class Scenario
 
     public static function campaign(Client $client, string $code, array $locations, ?Form $form, array $products): Campaign
     {
-        $c = Campaign::query()->create(['client_id' => $client->id, 'code' => $code, 'name' => $code, 'status' => CampaignStatus::Active, 'start_date' => now()->subDay()->toDateString(), 'end_date' => now()->addMonth()->toDateString()]);
+        $c = Campaign::query()->create(['client_id' => $client->id, 'code' => $code, 'name' => $code, 'status' => CampaignStatus::Active, 'start_date' => now()->subDay()->toDateString(), 'end_date' => now()->addMonth()->toDateString(), 'settings' => ['visit_photos' => false, 'review' => 'all', 'capture_geo' => 'first_visit', 'tasks' => ['sales' => true]]]);
         $c->locations()->sync(collect($locations)->pluck('id')->all());
         $c->products()->sync(collect($products)->pluck('id')->all());
         $form && $c->forms()->sync([$form->id]);

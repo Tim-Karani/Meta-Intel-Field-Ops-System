@@ -29,6 +29,7 @@ class LookupController extends ApiController
         'clients' => [Client::class, 'name'], 'campaigns' => [Campaign::class, 'name'], 'activities' => [Activity::class, 'name'],
         'locations' => [Location::class, 'name'], 'teams' => [Team::class, 'name'], 'territories' => [Territory::class, 'name'],
         'products' => [Product::class, 'name'], 'forms' => [Form::class, 'name'],
+        'channels' => [\App\Models\Channel::class, 'name'], 'distributors' => [\App\Models\Distributor::class, 'name'], 'outlet_types' => [\App\Models\OutletType::class, 'name'], 'outlet_statuses' => [\App\Models\OutletStatus::class, 'name'], 'categories' => [\App\Models\ProductCategory::class, 'name'], 'brands' => [\App\Models\Brand::class, 'name'],
     ];
 
     public function enums(): JsonResponse
@@ -40,8 +41,9 @@ class LookupController extends ApiController
             'visit_status' => $values(VisitStatus::class), 'gps_outcome' => $values(GpsOutcome::class), 'issue_status' => $values(IssueStatus::class),
             'question_types' => $values(QuestionType::class),
             'issue_priority' => ['low', 'medium', 'high', 'critical'],
-            'location_types' => ['retail_store', 'supermarket', 'wholesale', 'kiosk', 'pharmacy', 'bar_restaurant', 'market', 'event_venue', 'other'],
+            'location_types' => \App\Models\OutletType::query()->where('status', 'active')->orderBy('name')->pluck('slug')->all(),
             'agent_types' => ['merchandiser', 'brand_ambassador', 'promoter', 'sales_rep', 'enumerator', 'other'],
+            'employment_types' => ['permanent', 'reliever'],
             'payment_methods' => ['cash', 'mpesa', 'card', 'credit', 'other'],
             'kpi_metrics' => CampaignKpiController::METRICS,
             'visit_frequencies' => ['once', 'daily', 'weekly', 'biweekly', 'monthly'],
@@ -52,11 +54,11 @@ class LookupController extends ApiController
 
     public function options(Request $request, string $entity): JsonResponse
     {
-        if ($entity === 'agents' || $entity === 'supervisors' || $entity === 'staff') {
+        if (in_array($entity, ['agents', 'supervisors', 'team_leaders', 'staff'], true)) {
             abort_unless($request->user()->scopeType() !== 'own' && $request->user()->scopeType() !== 'client', 403);
             $q = AccessScope::scope(User::query(), $request->user())->whereNull('users.client_id')->where('users.status', 'active');
             if ($entity !== 'staff') {
-                $slug = $entity === 'agents' ? 'field_agent' : 'supervisor';
+                $slug = match ($entity) { 'agents' => 'field_agent', 'team_leaders' => 'team_leader', default => 'supervisor' };
                 $q->whereHas('roles', fn ($r) => $r->where('slug', $slug));
             }
             $name = 'users.name';

@@ -41,7 +41,7 @@ export function formModal({ title, fields, values = {}, onSubmit, submitLabel = 
  */
 export function crudPage({
   title, subtitle, noun, endpoint, columns, filters, fields, perms = {}, defaultSort, searchPlaceholder, toPayload = (v) => v, toValues = (r) => r,
-  onRowClick, rowActions, headerActions, embedded = false, search = true, emptyText, formSize, loadRecord, canEditRow, canDeleteRow, deleteMessage, query, intro, afterSave,
+  onRowClick, rowActions, headerActions, onForm, embedded = false, search = true, emptyText, formSize, loadRecord, canEditRow, canDeleteRow, deleteMessage, query, intro, afterSave,
 }) {
   const wrap = h('div');
   const tableHost = h('div');
@@ -52,7 +52,7 @@ export function crudPage({
   async function openForm(row) {
     let rec = row;
     if (row && loadRecord) { try { rec = await loadRecord(row); } catch (e) { toastError(e); return; } }
-    formModal({
+    const opened = formModal({
       title: row ? `Edit ${noun}` : `New ${noun}`, fields: getFields(rec), values: rec ? toValues(rec) : {}, size: formSize, intro: row ? null : intro,
       submitLabel: row ? 'Save changes' : `Create ${noun}`,
       onSubmit: async (v) => {
@@ -63,6 +63,7 @@ export function crudPage({
       },
       onSaved: (saved) => { afterSave?.(saved); reload(); },
     });
+    onForm?.(opened.form, rec, opened);
   }
 
   async function remove(row) {

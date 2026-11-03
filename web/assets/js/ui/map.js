@@ -20,7 +20,7 @@ const COLORS = { valid: '#16a34a', warning: '#f59e0b', suspicious: '#dc2626', re
  * markers: [{ lat, lng, label, tone, onClick, radiusM }]   radiusM draws a geofence circle.
  * Returns an element with .setMarkers(markers) and .fit().
  */
-export function mapView({ markers = [], height = 380, zoom, center, interactive = true } = {}) {
+export function mapView({ markers = [], height = 380, zoom, center, interactive = true, onPick } = {}) {
   const cfg = window.APP_CONFIG || {};
   const tiles = cfg.mapTileUrl || '';
   const el = h('div', { class: 'map', style: { height: `${height}px` }, role: 'application', 'aria-label': 'Map', tabindex: interactive ? 0 : null });
@@ -31,6 +31,7 @@ export function mapView({ markers = [], height = 380, zoom, center, interactive 
   el.append(tileLayer, overlay, markerLayer, tip);
   if (tiles && cfg.mapAttribution) el.append(h('div', { class: 'attr' }, cfg.mapAttribution));
 
+  const tileEls = new Map();
   let items = markers;
   let view = { lat: (center || cfg.defaultMapCenter || [0, 0])[0], lng: (center || cfg.defaultMapCenter || [0, 0])[1], z: zoom ?? 12 };
   const size = () => ({ w: el.clientWidth || 600, h: el.clientHeight || height });
@@ -42,20 +43,26 @@ export function mapView({ markers = [], height = 380, zoom, center, interactive 
     const toScreen = (lat, lng) => { const p = project(lat, lng, view.z); return { x: p.x - left, y: p.y - top }; };
 
     if (tiles) {
-      const n = 2 ** view.z; const frag = document.createDocumentFragment();
+      // Tiles are reused while panning (one request per tile, not one per redraw): the tile servers' usage policies require it.
+      const n = 2 ** view.z; const need = new Set();
       for (let tx = Math.floor(left / TILE); tx <= Math.floor((left + w) / TILE); tx++) {
         for (let ty = Math.floor(top / TILE); ty <= Math.floor((top + hh) / TILE); ty++) {
           if (ty < 0 || ty >= n) continue;
           const wrapped = ((tx % n) + n) % n;
-          const img = new Image(TILE, TILE);
-          img.className = 'tile'; img.alt = ''; img.draggable = false; img.referrerPolicy = 'no-referrer'; img.loading = 'lazy';
+          const key = `${view.z}/${tx}/${ty}`;
+          need.add(key);
+          let img = tileEls.get(key);
+          if (!img) {
+            img = new Image(TILE, TILE);
+            img.className = 'tile'; img.alt = ''; img.draggable = false; img.referrerPolicy = 'strict-origin-when-cross-origin'; img.decoding = 'async';
+            img.onerror = () => { img.style.display = 'none'; };
+            img.src = tiles.replace('{z}', view.z).replace('{x}', wrapped).replace('{y}', ty);
+            tileEls.set(key, img); tileLayer.append(img);
+          }
           img.style.left = `${tx * TILE - left}px`; img.style.top = `${ty * TILE - top}px`;
-          img.src = tiles.replace('{z}', view.z).replace('{x}', wrapped).replace('{y}', ty);
-          img.onerror = () => { img.style.display = 'none'; };
-          frag.append(img);
         }
       }
-      tileLayer.replaceChildren(frag);
+      for (const [key, img] of tileEls) if (!need.has(key)) { img.remove(); tileEls.delete(key); }
     }
 
     overlay.replaceChildren();
@@ -98,10 +105,19 @@ export function mapView({ markers = [], height = 380, zoom, center, interactive 
 
   if (interactive) {
     let drag = null;
-    el.addEventListener('pointerdown', (e) => { if (e.target.closest('.zoom,.marker')) return; drag = { x: e.clientX, y: e.clientY, p: project(view.lat, view.lng, view.z) }; el.setPointerCapture(e.pointerId); el.classList.add('dragging'); });
-    el.addEventListener('pointermove', (e) => { if (!drag) return; const np = unproject(drag.p.x - (e.clientX - drag.x), drag.p.y - (e.clientY - drag.y), view.z); view.lat = clampLat(np.lat); view.lng = np.lng; draw(); });
+    el.addEventListener('pointerdown', (e) => { if (e.target.closest('.zoom,.marker')) return; drag = { x: e.clientX, y: e.clientY, p: project(view.lat, view.lng, view.z), moved: 0 }; el.setPointerCapture(e.pointerId); el.classList.add('dragging'); });
+    el.addEventListener('pointermove', (e) => { if (!drag) return; drag.moved = Math.max(drag.moved, Math.abs(e.clientX - drag.x), Math.abs(e.clientY - drag.y)); const np = unproject(drag.p.x - (e.clientX - drag.x), drag.p.y - (e.clientY - drag.y), view.z); view.lat = clampLat(np.lat); view.lng = np.lng; draw(); });
     const end = () => { drag = null; el.classList.remove('dragging'); };
-    el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end);
+    // A click (not a drag) on a picker map drops the pin there.
+    el.addEventListener('pointerup', (e) => {
+      if (onPick && drag && drag.moved < 5) {
+        const r = el.getBoundingClientRect(); const { w, h: hh } = size(); const c = project(view.lat, view.lng, view.z);
+        const at = unproject(c.x - w / 2 + (e.clientX - r.left), c.y - hh / 2 + (e.clientY - r.top), view.z);
+        onPick(Number(at.lat.toFixed(6)), Number(at.lng.toFixed(6)));
+      }
+      end();
+    });
+    el.addEventListener('pointercancel', end);
     el.addEventListener('wheel', (e) => { e.preventDefault(); view.z = Math.max(2, Math.min(18, view.z + (e.deltaY < 0 ? 1 : -1))); draw(); }, { passive: false });
     el.addEventListener('keydown', (e) => { if (e.key === '+') { view.z = Math.min(18, view.z + 1); draw(); } if (e.key === '-') { view.z = Math.max(2, view.z - 1); draw(); } });
     el.append(h('div', { class: 'zoom' },

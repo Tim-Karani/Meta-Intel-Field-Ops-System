@@ -124,6 +124,30 @@ Route::prefix('v1')->group(function () {
             Route::delete('kpis/{id}', [V1\CampaignKpiController::class, 'destroy']);
         });
 
+        // ---- project templates (how a project runs) ----
+        Route::middleware('permission:campaigns.view')->group(function () {
+            Route::get('project-templates', [V1\ProjectTemplateController::class, 'index']);
+            Route::get('project-templates/{id}', [V1\ProjectTemplateController::class, 'show']);
+        });
+        Route::post('project-templates', [V1\ProjectTemplateController::class, 'store'])->middleware('permission:campaigns.edit');
+        Route::patch('project-templates/{id}', [V1\ProjectTemplateController::class, 'update'])->middleware('permission:campaigns.edit');
+        Route::delete('project-templates/{id}', [V1\ProjectTemplateController::class, 'destroy'])->middleware('permission:campaigns.archive');
+
+        // ---- fixed journey plans ----
+        Route::middleware('permission:assignments.create')->group(function () {
+            Route::get('journey-plans', [V1\JourneyPlanController::class, 'index']);
+            Route::get('journey-plans/owners', [V1\JourneyPlanController::class, 'owners']);
+            Route::get('journey-plans/{id}', [V1\JourneyPlanController::class, 'show']);
+            Route::post('journey-plans', [V1\JourneyPlanController::class, 'store']);
+        });
+        Route::middleware('permission:assignments.edit')->group(function () {
+            Route::patch('journey-plans/{id}', [V1\JourneyPlanController::class, 'update']);
+            Route::put('journey-plans/{id}/stops', [V1\JourneyPlanController::class, 'stops']);
+            Route::post('journey-plans/{id}/generate', [V1\JourneyPlanController::class, 'generate']);
+            Route::post('journey-plans/{id}/status', [V1\JourneyPlanController::class, 'status']);
+            Route::delete('journey-plans/{id}', [V1\JourneyPlanController::class, 'destroy']);
+        });
+
         // ---- activities ----
         Route::middleware('permission:activities.view')->group(function () {
             Route::get('activities', [V1\ActivityController::class, 'index']);
@@ -135,7 +159,12 @@ Route::prefix('v1')->group(function () {
             Route::delete('activities/{id}', [V1\ActivityController::class, 'destroy']);
         });
 
+        Route::get('places/search', [V1\PlaceSearchController::class, 'search'])->middleware(['permission:locations.manage,campaigns.create', 'throttle:30,1']);
+
         // ---- teams / territories / routes / locations ----
+        Route::post('locations/batch', [V1\LocationController::class, 'batch'])->middleware(['permission:locations.manage', 'throttle:exports']);
+        Route::get('locations/summary', [V1\LocationController::class, 'summary'])->middleware('permission:locations.view');
+        Route::post('locations/import', [V1\LocationController::class, 'import'])->middleware(['permission:locations.manage', 'throttle:exports']);
         Route::post('locations/field', [V1\LocationController::class, 'storeInField'])->middleware('permission:locations.capture');
         Route::post('locations/{id}/confirm-geo', [V1\LocationController::class, 'confirmGeo'])->middleware('permission:locations.manage');
         foreach ([
@@ -143,6 +172,12 @@ Route::prefix('v1')->group(function () {
             ['territories', V1\TerritoryController::class, 'territories.view', 'territories.manage'],
             ['routes', V1\RouteController::class, 'territories.view', 'territories.manage'],
             ['locations', V1\LocationController::class, 'locations.view', 'locations.manage'],
+            ['channels', V1\ChannelController::class, 'locations.view', 'locations.manage'],
+            ['outlet-types', V1\OutletTypeController::class, 'locations.view', 'locations.manage'],
+            ['outlet-subtypes', V1\OutletSubtypeController::class, 'locations.view', 'locations.manage'],
+            ['outlet-statuses', V1\OutletStatusController::class, 'locations.view', 'locations.manage'],
+            ['distributors', V1\DistributorController::class, 'locations.view', 'locations.manage'],
+            ['geo-areas', V1\GeoAreaController::class, 'locations.view', 'locations.manage'],
             ['brands', V1\BrandController::class, 'products.view', 'products.manage'],
             ['product-categories', V1\ProductCategoryController::class, 'products.view', 'products.manage'],
             ['products', V1\ProductController::class, 'products.view', 'products.manage'],
@@ -196,11 +231,54 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:attendance.view')->group(function () {
             Route::get('attendance', [V1\AttendanceController::class, 'index']);
             Route::get('attendance/today', [V1\AttendanceController::class, 'today']);
+            Route::get('attendance/board', [V1\AttendanceController::class, 'board']);
             Route::get('attendance/{id}', [V1\AttendanceController::class, 'show']);
         });
         Route::middleware('permission:attendance.create')->group(function () {
             Route::post('attendance/clock-in', [V1\AttendanceController::class, 'clockIn']);
             Route::post('attendance/clock-out', [V1\AttendanceController::class, 'clockOut']);
+        });
+
+        // ---- executive summary, live agents, scores (v1.4) ----
+        Route::get('executive/summary', [V1\ExecutiveController::class, 'summary'])->middleware('permission:reports.view');
+        Route::middleware('permission:agents.track')->group(function () {
+            Route::get('agents/live', [V1\ExecutiveController::class, 'agents']);
+            Route::get('agents/scores', [V1\ExecutiveController::class, 'scores']);
+            Route::get('agents/{id}/overview', [V1\ExecutiveController::class, 'agent']);
+        });
+        Route::post('agent/ping', [V1\AgentPingController::class, 'store'])->middleware(['permission:attendance.create', 'throttle:120,1']);
+
+        // ---- journey plan change requests ----
+        Route::middleware('permission:journey.request,journey.review')->group(function () {
+            Route::get('jp-requests', [V1\JpRequestController::class, 'index']);
+            Route::get('jp-requests/{id}/proof', [V1\JpRequestController::class, 'proof']);
+        });
+        Route::post('jp-requests', [V1\JpRequestController::class, 'store'])->middleware('permission:journey.request');
+        Route::middleware('permission:journey.review')->group(function () {
+            Route::post('jp-requests/{id}/approve', [V1\JpRequestController::class, 'approve']);
+            Route::post('jp-requests/{id}/reject', [V1\JpRequestController::class, 'reject']);
+        });
+
+        // ---- stock accountability (sales projects) ----
+        Route::middleware('permission:stock.view')->group(function () {
+            Route::get('stock', [V1\StockController::class, 'index']);
+            Route::get('stock/movements', [V1\StockController::class, 'movements']);
+        });
+        Route::post('stock', [V1\StockController::class, 'store'])->middleware('permission:stock.manage');
+
+        // ---- payroll ----
+        Route::middleware('permission:payroll.view')->group(function () {
+            Route::get('payroll-runs', [V1\PayrollController::class, 'index']);
+            Route::get('payroll-runs/{id}', [V1\PayrollController::class, 'show']);
+            Route::get('payroll-runs/{id}/export', [V1\PayrollController::class, 'export'])->middleware('throttle:exports');
+        });
+        Route::middleware('permission:payroll.manage')->group(function () {
+            Route::post('payroll-runs', [V1\PayrollController::class, 'store']);
+            Route::post('payroll-runs/{id}/recalculate', [V1\PayrollController::class, 'recalculate']);
+            Route::patch('payroll-runs/{id}/lines/{line}', [V1\PayrollController::class, 'updateLine']);
+            Route::post('payroll-runs/{id}/approve', [V1\PayrollController::class, 'approve']);
+            Route::post('payroll-runs/{id}/paid', [V1\PayrollController::class, 'markPaid']);
+            Route::delete('payroll-runs/{id}', [V1\PayrollController::class, 'destroy']);
         });
 
         // ---- visits ----
@@ -236,7 +314,7 @@ Route::prefix('v1')->group(function () {
             Route::get('photos/{id}', [V1\PhotoController::class, 'show']);
         });
         // Client users may open ACCEPTED photos of APPROVED visits of their own client (AccessScope::forPhoto).
-        Route::get('photos/{id}/file', [V1\PhotoController::class, 'file'])->middleware('permission:evidence.view,portal.view');
+        Route::get('photos/{id}/file', [V1\PhotoController::class, 'file'])->middleware('permission:evidence.view,portal.view,agents.track');
         Route::post('visits/{visit}/photos', [V1\PhotoController::class, 'store'])->middleware(['permission:evidence.upload', 'throttle:uploads']);
         Route::post('photos/{id}/review', [V1\PhotoController::class, 'review'])->middleware('permission:evidence.review');
         Route::delete('photos/{id}', [V1\PhotoController::class, 'destroy'])->middleware('permission:evidence.upload');
@@ -256,6 +334,15 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:reports.view')->group(function () {
             Route::get('reports', [V1\ReportController::class, 'types']);
             Route::get('reports/{type}', [V1\ReportController::class, 'show']);
+        });
+        Route::middleware('permission:reports.schedule')->prefix('report-schedules')->group(function () {
+            Route::get('options', [V1\ReportScheduleController::class, 'options']);
+            Route::get('/', [V1\ReportScheduleController::class, 'index']);
+            Route::post('/', [V1\ReportScheduleController::class, 'store']);
+            Route::patch('{id}', [V1\ReportScheduleController::class, 'update']);
+            Route::delete('{id}', [V1\ReportScheduleController::class, 'destroy']);
+            Route::post('{id}/send', [V1\ReportScheduleController::class, 'sendNow'])->middleware('throttle:exports');
+            Route::get('{id}/runs', [V1\ReportScheduleController::class, 'runs']);
         });
         Route::get('reports/{type}/export', [V1\ReportController::class, 'export'])->middleware(['permission:reports.export', 'throttle:exports']);
     });

@@ -1,7 +1,7 @@
 import { h } from '../core/dom.js';
 import { icon } from '../core/icons.js';
 import { api } from '../core/api.js';
-import { can, session } from '../core/auth.js';
+import { can, session, hasFeature } from '../core/auth.js';
 import { fmtDate, fmtDateTime, fmtDistance, fmtMoney, fmtNumber, titleCase } from '../core/format.js';
 import { asyncView, badge, kv, card, pageHead, tabs, toast, toastError, confirmDialog, empty } from '../ui/feedback.js';
 import { simpleTable } from '../ui/table.js';
@@ -22,20 +22,24 @@ export default async function render({ container, params }) {
       if (!r) return; try { await api.post(`visits/${v.id}/reject`, { note: r.reason }); toast('Visit rejected.'); reload(); } catch (e) { toastError(e); }
     }));
     if (canDecide && can('visits.approve')) actions.push(act('Approve', 'primary', 'check', async () => {
-      const r = await confirmDialog({ title: 'Approve this visit?', message: 'Approved visits become visible to the client.', confirmLabel: 'Approve', reason: { label: 'Note (optional)', required: false } });
+      const newOutlet = v.location?.needs_review;
+      const r = await confirmDialog({ title: 'Approve this visit?', message: `Approved visits become visible to the client.${newOutlet ? ' This also confirms the outlet position captured by this visit.' : ''}`, confirmLabel: 'Approve', reason: { label: 'Note (optional)', required: false } });
       if (!r) return; try { await api.post(`visits/${v.id}/approve`, { note: r.reason || null }); toast('Visit approved.'); reload(); } catch (e) { toastError(e); }
     }));
 
+    const WHY = { new_outlet: 'First visit to a new outlet. Check the pin on the map and the check-in photo. Approving also confirms the outlet position.', gps_warning: 'The GPS reading was flagged. Check the GPS tab before deciding.', review_all: 'This project reviews every visit.' };
     const flagged = v.gps_outcome === 'suspicious' || v.gps_outcome === 'warning';
     return h('div', null,
       pageHead({ title: v.location?.name || 'Visit', subtitle: `${fmtDate(v.visit_date)} · ${v.agent?.name || ''} · ${v.campaign?.name || ''}`, actions }),
+      v.auto_approved && h('div', { class: 'alert ok', style: { marginBottom: '16px' } }, icon('checkCircle'), h('div', null, h('strong', null, 'Approved automatically. '), 'The outlet position is known and the GPS reading was clean, so no one needed to review it.')),
+      canDecide && v.review_reason && WHY[v.review_reason] && h('div', { class: 'alert info', style: { marginBottom: '16px' } }, icon('info'), h('div', null, h('strong', null, 'Why this needs you: '), WHY[v.review_reason])),
       v.status === 'rejected' && v.review_note && h('div', { class: 'alert error', style: { marginBottom: '16px' } }, icon('alert'), h('div', null, h('strong', null, 'Rejected: '), v.review_note)),
       flagged && h('div', { class: 'alert warn', style: { marginBottom: '16px' } }, icon('alert'), h('div', null, h('strong', null, `GPS result: ${v.gps_outcome}. `), (v.checkin?.reasons || []).map((r) => r.detail).join(' ') || 'See the GPS tab.')),
       tabs([
         { key: 'overview', label: 'Overview', render: () => overview(v) },
         { key: 'gps', label: 'GPS', render: () => gpsTab(v) },
         { key: 'responses', label: 'Form responses', render: () => responsesTab(v) },
-        { key: 'sales', label: `Sales (${v.sales?.length ?? 0})`, render: () => salesTab(v) },
+        ...(hasFeature('sales') || v.sales?.length ? [{ key: 'sales', label: `Sales (${v.sales?.length ?? 0})`, render: () => salesTab(v) }] : []),
         { key: 'osa', label: `OSA (${v.osa_records?.length ?? 0})`, render: () => osaTab(v) },
         { key: 'merch', label: `Merchandising (${v.merchandising_records?.length ?? 0})`, render: () => merchTab(v) },
         { key: 'photos', label: `Photos (${v.photos?.length ?? 0})`, render: () => photoGrid((v.photos || []).map((p) => ({ ...p, visit: { location: v.location, campaign: v.campaign } })), { onChange: reload }) },

@@ -10,8 +10,8 @@ import { normalise } from './form.js';
  *  filters: [{ key, label, options|loadOptions, type: 'select'|'date' }]
  * State (page, sort, search, filters) lives in the component; each change re-queries the API.
  */
-export function dataTable({ endpoint, columns, filters = [], search = true, searchPlaceholder = 'Search…', defaultSort, query = {}, perPage = 20, onRowClick, rowClass, emptyTitle = 'Nothing here yet', emptyText, emptyAction, toolbarExtra, mapRows, unwrap, id }) {
-  const state = { page: 1, sort: defaultSort || null, search: '', filters: {} };
+export function dataTable({ endpoint, columns, filters = [], search = true, searchPlaceholder = 'Search…', defaultSort, query = {}, perPage = 20, onRowClick, rowClass, emptyTitle = 'Nothing here yet', emptyText, emptyAction, toolbarExtra, mapRows, unwrap, id, selectable = false, onSelectionChange }) {
+  const state = { page: 1, sort: defaultSort || null, search: '', filters: {}, selected: new Map() };
   const root = h('div', { class: 'card' });
   const toolbar = h('div', { class: 'toolbar' });
   const body = h('div', { class: 'table-wrap' });
@@ -58,7 +58,14 @@ export function dataTable({ endpoint, columns, filters = [], search = true, sear
       body.append(empty(filtered ? 'No matching results' : emptyTitle, filtered ? 'Try different search terms or clear the filters.' : emptyText, filtered ? null : emptyAction));
       return;
     }
-    const head = h('tr', null, columns.map((c) => {
+    const emit = () => onSelectionChange?.([...state.selected.keys()], [...state.selected.values()]);
+    const boxes = [];
+    const syncHead = () => { allBox.checked = rows.length > 0 && rows.every((r) => state.selected.has(r.id)); };
+    const allBox = selectable ? h('input', { type: 'checkbox', 'aria-label': 'Select all on this page', onchange: () => {
+      rows.forEach((r) => (allBox.checked ? state.selected.set(r.id, r) : state.selected.delete(r.id)));
+      boxes.forEach((b) => { b.checked = allBox.checked; }); emit();
+    } }) : null;
+    const head = h('tr', null, selectable && h('th', { scope: 'col', style: { width: '36px' } }, allBox), columns.map((c) => {
       const active = state.sort && state.sort.replace('-', '') === c.sort;
       const dir = active ? (state.sort.startsWith('-') ? 'descending' : 'ascending') : 'none';
       return h('th', { scope: 'col', 'aria-sort': c.sort ? dir : null, class: c.align === 'right' ? 'right' : null },
@@ -68,9 +75,11 @@ export function dataTable({ endpoint, columns, filters = [], search = true, sear
       const tr = h('tr', { class: [onRowClick && 'clickable', rowClass?.(r)], tabindex: onRowClick ? 0 : null,
         onclick: onRowClick ? (e) => { if (!e.target.closest('a,button,input,select,label')) onRowClick(r); } : null,
         onkeydown: onRowClick ? (e) => { if (e.key === 'Enter' && e.target === tr) onRowClick(r); } : null },
+      [selectable && h('td', null, (() => { const b = h('input', { type: 'checkbox', 'aria-label': `Select ${r.name || 'row'}`, checked: state.selected.has(r.id), onchange: () => { b.checked ? state.selected.set(r.id, r) : state.selected.delete(r.id); syncHead(); emit(); } }); boxes.push(b); return b; })())],
       columns.map((c) => h('td', { class: [c.class, c.align === 'right' && 'right'] }, c.render ? c.render(r) : (r[c.key] ?? h('span', { class: 'muted' }, '—')))));
       return tr;
     }));
+    if (selectable) syncHead();
     body.append(h('table', { class: 'data' }, h('thead', null, head), tbody));
 
     if (meta?.total != null) {
@@ -83,7 +92,7 @@ export function dataTable({ endpoint, columns, filters = [], search = true, sear
   }
 
   load();
-  return Object.assign(root, { reload: load, state });
+  return Object.assign(root, { reload: load, state, clearSelection: () => { state.selected.clear(); onSelectionChange?.([], []); load(); }, selectedIds: () => [...state.selected.keys()] });
 }
 
 /** Static table from rows already in memory. */

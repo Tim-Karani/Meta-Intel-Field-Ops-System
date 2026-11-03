@@ -16,7 +16,9 @@ class SecurityHeaders
         $response->headers->set('X-Frame-Options', 'DENY');
         $response->headers->set('Referrer-Policy', 'no-referrer');
         $response->headers->set('Permissions-Policy', 'geolocation=(), camera=(), microphone=()');
-        $response->headers->set('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+        if (!$response->headers->has('Content-Security-Policy')) {      // evidence files set their own, stricter, policy
+            $response->headers->set('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+        }
         if (!$response->headers->has('Cache-Control') || str_contains((string) $response->headers->get('Cache-Control'), 'no-cache')) {
             $response->headers->set('Cache-Control', 'no-store');
         }

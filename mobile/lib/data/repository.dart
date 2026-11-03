@@ -165,6 +165,38 @@ class Repository {
     return rows.map((r) => r['entity_id'] as String).toSet();
   }
 
+  /// Operations for one visit that the server refused and that now wait for a person.
+  Future<List<OutboxOp>> stuckFor(String entityId) async {
+    final rows = await _db.query('outbox', where: "entity_id = ? AND status IN ('FAILED','CONFLICT')", whereArgs: [entityId], orderBy: 'seq');
+    return rows.map(OutboxOp.fromRow).toList();
+  }
+
+  /// Removes an outlet the server refused, together with the visit and everything recorded for it on this phone.
+  /// Only allowed while the outlet has not reached the server.
+  Future<void> discardUnsentOutlet(String visitLocalId) async {
+    final create = await _db.query('outbox', where: "type = 'outlet_create' AND entity_id = ? AND status != 'SYNCED'", whereArgs: [visitLocalId], limit: 1);
+    if (create.isEmpty) throw StateError('This outlet has already reached the server and cannot be discarded here.');
+    final v = await visit(visitLocalId);
+    final photoRows = await photos(visitLocalId);
+    await _db.transaction((tx) async {
+      await tx.delete('outbox', where: 'entity_id = ?', whereArgs: [visitLocalId]);
+      await tx.delete('visit_items', where: 'visit_local_id = ?', whereArgs: [visitLocalId]);
+      await tx.delete('photos', where: 'visit_local_id = ?', whereArgs: [visitLocalId]);
+      await tx.delete('issues', where: 'visit_local_id = ?', whereArgs: [visitLocalId]);
+      await tx.delete('visits', where: 'local_id = ?', whereArgs: [visitLocalId]);
+      if (v != null) await tx.delete('assignments', where: 'id = ?', whereArgs: [v.assignmentId]);
+    });
+    for (final p in photoRows) {
+      final path = p['path'] as String?;
+      if (path == null) continue;
+      try {
+        final f = File(path);
+        if (await f.exists()) await f.delete();
+      } catch (_) {/* cache only */}
+    }
+    touch();
+  }
+
   Future<int> unsyncedFor(String entityId) async =>
       Sqflite.firstIntValue(await _db.rawQuery("SELECT COUNT(*) FROM outbox WHERE entity_id = ? AND status != 'SYNCED'", [entityId])) ?? 0;
 
@@ -281,24 +313,24 @@ class Repository {
 
   // ---------------------------------------------------------------- field actions
 
-  /// Campaigns the agent can add an outlet to: one entry per campaign from the assignments on the phone, carrying a
-  /// recent sibling assignment (its form / activity / campaign details are copied onto the new outlet's assignment).
-  Future<List<AssignmentView>> outletCampaigns() async {
-    final all = await assignments();
-    final byCampaign = <String, AssignmentView>{};
-    for (final a in all.reversed) {
-      final cid = a.campaignId;
-      if (cid == null || a.isCancelled || a.removed) continue;
-      byCampaign.putIfAbsent(cid, () => a);
+  /// Campaigns the agent works in (from the server's last sync), each saying whether this agent may add outlets to it.
+  /// Does NOT depend on having an assignment today: a reliever with no visits yet can still add the outlet they stand at.
+  Future<List<OutletCampaign>> outletCampaigns({bool onlyAllowed = false}) async {
+    final raw = await meta('campaigns');
+    if (raw == null) return const [];
+    try {
+      final all = (jsonDecode(raw) as List).map((e) => OutletCampaign((e as Map).cast<String, dynamic>())).toList();
+      return onlyAllowed ? all.where((c) => c.canAdd).toList() : all;
+    } catch (_) {
+      return const [];
     }
-    return byCampaign.values.toList()..sort((a, b) => a.campaignName.compareTo(b.campaignName));
   }
 
   /// Adds an outlet while standing at it - works offline. Creates, in one transaction: a provisional assignment for
   /// today, the (not yet started) visit, and the outbox steps "add outlet" then "start visit". Ids are generated here,
   /// so the server can later accept them as they are. Returns the local visit id.
   Future<String> createOutlet({
-    required AssignmentView sibling,
+    required OutletCampaign campaign,
     required String name,
     String type = 'retail_store',
     String? town,
@@ -309,8 +341,9 @@ class Repository {
   }) async {
     final clean = name.trim();
     final today = todayStr();
+    if (!campaign.canAdd) throw StateError(campaign.denial ?? 'You cannot add outlets to this project.');
     final dupe = (await assignments(from: today, to: today)).any((a) =>
-        a.campaignId == sibling.campaignId && a.locationName.trim().toLowerCase() == clean.toLowerCase() && (town == null || a.town == null || a.town!.toLowerCase() == town.trim().toLowerCase()));
+        a.campaignId == campaign.id && a.locationName.trim().toLowerCase() == clean.toLowerCase() && (town == null || a.town == null || a.town!.toLowerCase() == town.trim().toLowerCase()));
     if (dupe) throw StateError('"$clean" is already on your list for today. Open it from My work instead.');
 
     final locationId = newId();
@@ -333,14 +366,13 @@ class Repository {
     };
     final assignmentJson = <String, dynamic>{
       'id': assignmentId,
-      'campaign_id': sibling.campaignId,
-      'campaign': sibling.raw['campaign'],
-      'activity_id': sibling.raw['activity_id'],
-      'activity': sibling.raw['activity'],
+      'campaign_id': campaign.id,
+      'campaign': {'id': campaign.id, 'name': campaign.name, 'client': campaign.raw['client'], 'settings': campaign.raw['settings']},
+      'activity_id': campaign.activityId,
       'location_id': locationId,
       'location': locationJson,
-      'form_id': sibling.formId,
-      'supervisor': sibling.raw['supervisor'],
+      'form_id': campaign.formId,
+      'source': 'field',
       'scheduled_date': today,
       'status': 'accepted',
       'instructions': 'Added in the field by you. The outlet position is saved when you check in.',
@@ -348,8 +380,8 @@ class Repository {
     final apiPayload = <String, dynamic>{
       'location_id': locationId,
       'assignment_id': assignmentId,
-      'campaign_id': sibling.campaignId,
-      if (sibling.raw['activity_id'] != null) 'activity_id': sibling.raw['activity_id'],
+      'campaign_id': campaign.id,
+      if (campaign.activityId != null) 'activity_id': campaign.activityId,
       'name': clean,
       'type': type,
       if (_blankToNull(town) != null) 'town': town!.trim(),
@@ -364,8 +396,8 @@ class Repository {
       await tx.insert('visits', {
         'local_id': visitId,
         'assignment_id': assignmentId,
-        'form_id': sibling.formId,
-        'campaign_id': sibling.campaignId,
+        'form_id': campaign.formId,
+        'campaign_id': campaign.id,
         'location_id': locationId,
         'status': 'scheduled',
         'visit_date': today,
@@ -530,6 +562,18 @@ class Repository {
     final out = <String>[];
     if (v.status == 'scheduled') out.add('Check in at the location first.');
     if (v.status == 'started') out.add('Check out before submitting.');
+    final stuck = await stuckFor(v.localId);
+    if (stuck.isNotEmpty) out.add('${stuck.length} item${stuck.length == 1 ? '' : 's'} could not be sent to the server (see the banner on this visit and the Sync center). Fix or discard ${stuck.length == 1 ? 'it' : 'them'} first.');
+    final rules = (await assignment(v.assignmentId))?.rules ?? const ProjectRules();
+    if (rules.minPhotos > 0) {
+      final have = (await photos(v.localId)).where((p) => (p['kind'] ?? 'evidence') == 'evidence').length;
+      if (have < rules.minPhotos) out.add('This project needs at least ${rules.minPhotos} photo${rules.minPhotos == 1 ? '' : 's'} (you have $have).');
+    }
+    if (rules.visitPhotos) {
+      final kinds = (await photos(v.localId)).map((p) => p['kind']).toSet();
+      if (!kinds.contains('checkin')) out.add('The check-in photo is missing.');
+      if (!kinds.contains('checkout')) out.add('The check-out photo is missing.');
+    }
     final def = await form(v.formId);
     if (def != null) {
       final photoRows = await photos(v.localId);
@@ -684,6 +728,9 @@ class Repository {
     for (final r in visitRows) {
       dirty.add(r['assignment_id'] as String);
     }
+    if (data['campaigns'] is List) await setMeta('campaigns', jsonEncode(data['campaigns']));
+    final prof = data.obj('profile');
+    if (prof != null) await setMeta('employment_type', prof.str('employment_type'));
     await _db.transaction((tx) async {
       for (final a in data.list('assignments')) {
         final m = (a as Map).cast<String, dynamic>();

@@ -35,7 +35,7 @@ onRoute(async (state) => {
   // Already signed in and visiting the login screen: go home (but not for password-reset links).
   if (state.route?.public && session.isAuthenticated && state.route.path === '/login') { navigate(homeFor(session.user), { replace: true }); return; }
 
-  document.title = `${state.route?.title || 'Not found'} · ${window.APP_CONFIG?.appName || 'Field Operations'}`;
+  document.title = `${state.route?.title || 'Not found'} · ${window.APP_CONFIG?.appName || 'MetaIntel'}`;
 
   if (state.route?.layout === 'bare') {
     shell?.dispose(); shell = null;

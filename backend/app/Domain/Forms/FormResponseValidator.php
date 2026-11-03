@@ -79,11 +79,19 @@ class FormResponseValidator
 
     private function conditionHolds(string $op, mixed $expected, mixed $actual): bool
     {
+        // Condition values are stored as a list (a single value is a list of one): unwrap it so "equals false" means false.
+        if (is_array($expected) && array_is_list($expected) && count($expected) === 1) {
+            $expected = $expected[0];
+        }
+        $oneOf = fn (mixed $v, array $list) => in_array($this->loose($v), array_map(fn ($x) => $this->loose($x), $list), true);
+
         return match ($op) {
             'answered' => !$this->isEmpty($actual),
-            'equals' => is_array($actual) ? in_array($expected, $actual, false) : $this->loose($actual) === $this->loose($expected),
-            'not_equals' => is_array($actual) ? !in_array($expected, $actual, false) : $this->loose($actual) !== $this->loose($expected),
-            'contains' => is_array($actual) ? in_array($expected, $actual, false) : (is_string($actual) && is_string($expected) && str_contains($actual, $expected)),
+            'equals' => is_array($actual) ? (is_array($expected) ? array_intersect(array_map(fn ($x) => $this->loose($x), $actual), array_map(fn ($x) => $this->loose($x), $expected)) !== [] : $oneOf($expected, $actual))
+                : (is_array($expected) ? $oneOf($actual, $expected) : $this->loose($actual) === $this->loose($expected)),
+            'not_equals' => is_array($actual) ? !(is_array($expected) ? array_intersect(array_map(fn ($x) => $this->loose($x), $actual), array_map(fn ($x) => $this->loose($x), $expected)) !== [] : $oneOf($expected, $actual))
+                : !(is_array($expected) ? $oneOf($actual, $expected) : $this->loose($actual) === $this->loose($expected)),
+            'contains' => is_array($actual) ? (is_array($expected) ? false : $oneOf($expected, $actual)) : (is_string($actual) && is_string($expected) && str_contains($actual, $expected)),
             'gt' => is_numeric($actual) && is_numeric($expected) && $actual > $expected,
             'lt' => is_numeric($actual) && is_numeric($expected) && $actual < $expected,
             default => true,
@@ -95,7 +103,9 @@ class FormResponseValidator
         if (is_bool($v)) {
             return $v ? 'yes' : 'no';
         }
-        return is_scalar($v) ? strtolower((string) $v) : $v;
+        $t = is_scalar($v) ? strtolower(trim((string) $v)) : $v;
+
+        return match ($t) { 'true', 'yes', 'on' => 'yes', 'false', 'no', 'off' => 'no', default => $t };
     }
 
     private function isEmpty(mixed $v): bool

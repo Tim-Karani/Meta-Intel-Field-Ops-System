@@ -149,8 +149,10 @@ class _OpCard extends ConsumerWidget {
         const SizedBox(height: 2),
         Text('Saved ${relative(op.createdAt)}${op.retryCount > 0 ? '  -  ${op.retryCount} retr${op.retryCount == 1 ? 'y' : 'ies'}' : ''}${backingOff ? '  -  next try ${relative(op.nextAttemptAt)}' : ''}',
             style: const TextStyle(color: Brand.muted, fontSize: 12.5)),
-        if (op.error != null && op.status != OpStatus.synced)
-          Padding(padding: const EdgeInsets.only(top: 6), child: Text(op.error!, style: TextStyle(color: op.needsAttention ? Brand.bad : Brand.muted, fontSize: 13))),
+        if (op.needsAttention)
+          Padding(padding: const EdgeInsets.only(top: 6), child: Text(op.explanation, style: const TextStyle(color: Brand.bad, fontSize: 13))),
+        if (!op.needsAttention && op.error != null && op.status != OpStatus.synced)
+          Padding(padding: const EdgeInsets.only(top: 6), child: Text(op.error!, style: const TextStyle(color: Brand.muted, fontSize: 13))),
         if (stuck) ...[
           const SizedBox(height: 8),
           Row(children: [

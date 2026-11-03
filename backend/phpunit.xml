@@ -8,22 +8,22 @@
     </testsuites>
     <source><include><directory>app</directory></include></source>
     <php>
-        <env name="APP_ENV" value="testing"/>
+        <env name="APP_ENV" value="testing" force="true"/>
         <env name="APP_KEY" value="base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="/>
-        <env name="APP_DEBUG" value="false"/>
+        <env name="APP_DEBUG" value="false" force="true"/>
         <!-- Feature tests need PostgreSQL (jsonb, ILIKE, audit trigger). In CI this is a service container. -->
         <env name="DB_CONNECTION" value="pgsql"/>
         <env name="DB_HOST" value="127.0.0.1"/>
         <env name="DB_PORT" value="5432"/>
-        <env name="DB_DATABASE" value="field_ops_test"/>
+        <env name="DB_DATABASE" value="field_ops_test" force="true"/>
         <env name="DB_USERNAME" value="field_ops"/>
         <env name="DB_PASSWORD" value="change-me-locally"/>
-        <env name="CACHE_STORE" value="array"/>
-        <env name="QUEUE_CONNECTION" value="sync"/>
-        <env name="SESSION_DRIVER" value="array"/>
-        <env name="MAIL_MAILER" value="array"/>
-        <env name="BCRYPT_ROUNDS" value="4"/>
-        <env name="EVIDENCE_DISK" value="evidence"/>
-        <env name="SEED_DEMO" value="false"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+        <env name="MAIL_MAILER" value="array" force="true"/>
+        <env name="BCRYPT_ROUNDS" value="4" force="true"/>
+        <env name="EVIDENCE_DISK" value="evidence" force="true"/>
+        <env name="SEED_DEMO" value="false" force="true"/>
     </php>
 </phpunit>

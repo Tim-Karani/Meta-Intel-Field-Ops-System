@@ -23,9 +23,7 @@ class PhotosPage extends ConsumerWidget {
         icon: const Icon(Icons.photo_camera),
         label: const Text('Take photo'),
         onPressed: () async {
-          final form = await r.read(repoProvider).form(v.formId);
-          if (!c.mounted) return;
-          await captureEvidence(c, r, v, liveOnly: form?.requiresLiveCapture ?? true);
+          await captureEvidence(c, r, v);
         },
       ),
       builder: (c, r, v, editable) {

@@ -37,7 +37,7 @@ class VisitWorkflowTest extends DatabaseTestCase
         $this->api('PUT', "visits/$id/osa", ['product_id' => $this->s->productA->id, 'available' => true, 'facings' => 4])->assertOk();
         $this->api('POST', "visits/$id/merchandising", ['posm_present' => true, 'posm_type' => 'shelf strip'])->assertCreated();
         if ($withPhoto) {
-            $this->api('POST', "visits/$id/photos", ['file' => UploadedFile::fake()->image('shelf.jpg', 800, 600), 'question_id' => $q['Shelf photo']])->assertCreated();
+            $this->api('POST', "visits/$id/photos", ['source' => 'camera', 'file' => UploadedFile::fake()->image('shelf.jpg', 800, 600), 'question_id' => $q['Shelf photo']])->assertCreated();
         }
         $this->api('POST', "visits/$id/check-out", Scenario::gps())->assertOk()->assertJsonPath('data.status', 'completed');
     }
@@ -96,9 +96,9 @@ class VisitWorkflowTest extends DatabaseTestCase
     public function test_check_in_far_from_the_location_is_rejected_and_recorded(): void
     {
         $id = $this->startVisit();
-        $this->api('POST', "visits/$id/check-in", Scenario::gps(5000))->assertStatus(422)->assertJsonPath('code', 'gps_rejected');
+        $this->api('POST', "visits/$id/check-in", Scenario::gps(5000))->assertStatus(422)->assertJsonPath('code', 'outside_radius');
         $this->assertSame('scheduled', Visit::query()->find($id)->status->value);
-        $this->assertDatabaseHas('visit_events', ['visit_id' => $id, 'type' => 'checkin_rejected']);
+        $this->assertDatabaseHas('visit_events', ['visit_id' => $id, 'type' => 'checkin_blocked_distance']);
         // The agent can retry from the right place.
         $this->api('POST', "visits/$id/check-in", Scenario::gps(10))->assertOk();
     }
@@ -150,7 +150,7 @@ class VisitWorkflowTest extends DatabaseTestCase
         $q = $this->s->questionIds();
         $this->api('PUT', "visits/$id/responses", ['answers' => [$q['Facings'] => 1]])->assertStatus(409);
         $this->api('POST', "visits/$id/sales", ['items' => [['product_id' => $this->s->productA->id, 'quantity' => 1]]])->assertStatus(409);
-        $this->api('POST', "visits/$id/photos", ['file' => UploadedFile::fake()->image('late.jpg')])->assertStatus(409);
+        $this->api('POST', "visits/$id/photos", ['source' => 'camera', 'file' => UploadedFile::fake()->image('late.jpg')])->assertStatus(409);
         $this->api('POST', "visits/$id/submit")->assertStatus(409);
     }
 

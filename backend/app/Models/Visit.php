@@ -23,6 +23,8 @@ class Visit extends Model
         'location_id',
         'form_id',
         'status',
+        'auto_approved',
+        'review_reason',
         'visit_date',
         'started_at',
         'completed_at',
@@ -45,6 +47,7 @@ class Visit extends Model
             'completed_at' => 'datetime',
             'submitted_at' => 'datetime',
             'reviewed_at' => 'datetime',
+            'auto_approved' => 'boolean',
         ];
     }
 

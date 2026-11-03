@@ -30,8 +30,9 @@ GoRouter buildRouter(Session session) {
     redirect: (context, state) {
       final atLogin = state.matchedLocation == '/login';
       if (!session.signedIn) return atLogin ? null : '/login';
-      // An expired session keeps the user inside the app (their work is on the phone); they re-authenticate from Profile or the banner.
-      if (atLogin && !session.expired) return '/home';
+      // An expired session sends the user straight to the sign-in screen (their saved work stays on the phone and syncs after sign-in).
+      if (session.expired) return atLogin ? null : '/login';
+      if (atLogin) return '/home';
       return null;
     },
     routes: [

@@ -97,3 +97,18 @@ final lastSyncProvider = FutureProvider.autoDispose<String?>((ref) async {
   ref.watch(syncStateProvider);
   return ref.watch(repoProvider).meta('last_sync');
 });
+
+/// Operations of one visit that the server refused (waiting for a person).
+final stuckOpsProvider = FutureProvider.autoDispose.family<List<OutboxOp>, String>((ref, visitId) async {
+  ref.watch(revisionProvider);
+  return ref.watch(repoProvider).stuckFor(visitId);
+});
+
+/// Steps without which nothing else for the visit can exist on the server.
+const foundationOps = {'outlet_create', 'visit_create'};
+
+/// Campaigns this agent may add outlets to (drives whether "Add outlet" is offered at all).
+final outletCampaignsProvider = FutureProvider.autoDispose<List<OutletCampaign>>((ref) async {
+  ref.watch(revisionProvider);
+  return ref.watch(repoProvider).outletCampaigns(onlyAllowed: true);
+});

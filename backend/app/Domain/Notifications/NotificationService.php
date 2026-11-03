@@ -29,7 +29,7 @@ class NotificationService
     {
         $visit->loadMissing(['assignment', 'agent.agentProfile']);
 
-        return collect([$visit->assignment?->supervisor_id, $visit->agent?->agentProfile?->supervisor_id])
+        return collect([$visit->assignment?->supervisor_id, $visit->agent?->agentProfile?->supervisor_id, $visit->agent?->agentProfile?->team_leader_id])
             ->merge(DB::table('campaign_users')->where('campaign_id', $visit->campaign_id)->pluck('user_id'))
             ->filter()->reject(fn ($id) => $id === $visit->agent_id)->unique()->values();
     }

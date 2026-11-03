@@ -2,7 +2,7 @@ import { h } from '../core/dom.js';
 import { icon } from '../core/icons.js';
 import { api } from '../core/api.js';
 import { can } from '../core/auth.js';
-import { fmtDate, fmtMoney, fmtNumber, titleCase } from '../core/format.js';
+import { fmtDate, fmtMoney, fmtNumber, titleCase, daysLeft } from '../core/format.js';
 import { asyncView, badge, kv, card, pageHead, tabs, toast, toastError, confirmDialog } from '../ui/feedback.js';
 import { dataTable, simpleTable } from '../ui/table.js';
 import { formModal, crudPage } from '../ui/crud.js';
@@ -10,8 +10,10 @@ import { pickerModal } from '../ui/picker.js';
 import { photoGrid } from '../ui/gallery.js';
 import { href, navigate } from '../core/router.js';
 import { lookup, enumOptions } from '../core/lookups.js';
-import { campaignFields } from './campaigns.js';
+import { campaignFields, loadSetup, campaignValues, campaignBody, wireTemplate } from './campaigns.js';
+import { settingsSummary } from '../ui/project-setup.js';
 import { activityFields } from './activities.js';
+import { plansPanel } from './journey-plans.js';
 
 const LINKS = [
   { rel: 'teams', label: 'Teams', entity: 'teams', hint: 'Teams working on this campaign.' },
@@ -23,29 +25,37 @@ const LINKS = [
 
 export default async function render({ container, params }) {
   const holder = h('div'); container.append(holder);
-  asyncView(holder, () => api.get(`campaigns/${params.id}`).then((r) => r.data), (c, reload) => {
+  let plans = null;
+  asyncView(holder, async () => { const c = await api.get(`campaigns/${params.id}`).then((r) => r.data); plans = c.settings?.journey_plan ? await api.get('journey-plans', { campaign_id: c.id, per_page: 1 }).then((r) => r.meta?.total ?? 0).catch(() => null) : null; return c; }, (c, reload) => {
     const canEdit = can('campaigns.edit');
     const edit = canEdit && c.status !== 'archived' && h('button', { class: 'btn', type: 'button', onclick: async () => {
       const clients = await lookup('clients').catch(() => []);
-      formModal({ title: 'Edit campaign', fields: campaignFields(c).map((f) => (f.name === 'client_id' ? { ...f, options: clients } : f)), values: c, size: 'lg', submitLabel: 'Save changes',
-        onSubmit: async (v) => { const o = { ...v }; if (o.budget === null) delete o.budget; await api.patch(`campaigns/${c.id}`, o); toast('Campaign updated.'); }, onSaved: reload });
+      const { templates, setup } = await loadSetup(c);
+      const { form } = formModal({ title: 'Edit campaign', fields: campaignFields(c, setup).map((f) => (f.name === 'client_id' ? { ...f, options: clients } : f)), values: campaignValues(c), size: 'lg', submitLabel: 'Save changes',
+        onSubmit: async (v) => { const o = campaignBody(v); if (o.budget === null) delete o.budget; await api.patch(`campaigns/${c.id}`, o); toast('Campaign updated.'); }, onSaved: reload });
+      wireTemplate(form, templates);
     } }, icon('edit', { size: 16 }), 'Edit');
 
     const transitions = canEdit ? (c.allowed_transitions || []).map((s) => h('button', { class: ['btn', s === 'archived' ? 'danger' : s === 'active' ? 'primary' : ''], type: 'button', onclick: () => transition(c, s, reload) }, TRANSITION_LABEL[s] || `Move to ${titleCase(s)}`)) : [];
 
-    return h('div', null,
-      pageHead({ title: c.name, subtitle: `${c.client?.name || ''} · ${c.code}`, actions: [badge(c.status), edit, ...transitions] }),
-      tabs([
-        { key: 'overview', label: 'Overview', render: () => overview(c) },
-        { key: 'activities', label: `Activities (${c.activities?.length ?? 0})`, render: () => activitiesTab(c, reload) },
-        { key: 'resources', label: 'Teams, locations & more', render: () => resourcesTab(c, reload) },
-        { key: 'kpis', label: `KPIs (${c.kpis?.length ?? 0})`, render: () => kpiTab(c) },
-        { key: 'assignments', label: 'Assignments', render: () => assignmentsTab(c) },
+    const canJp = !!c.settings?.journey_plan && (can('assignments.view') || can('assignments.create'));
+    const sub = (items) => tabs(items.filter(Boolean));
+    let ws; // the workspace tabs, so the checklist can jump between them
+    const go = (key) => ws?.select(key);
+    ws = tabs([
+      { key: 'overview', label: 'Overview', render: () => overview(c, plans, go) },
+      { key: 'setup', label: 'Setup', render: () => h('div', { class: 'stack' }, activitiesTab(c, reload), kpiTab(c)) },
+      { key: 'outlets', label: 'Outlets & team', render: () => resourcesTab(c, reload, go) },
+      canJp && { key: 'plans', label: 'Journey plans', render: (panel) => { const host = h('div', { class: 'stack' }); plansPanel({ container: host, campaigns: [{ value: c.id, label: c.name }], campaign: c }); return h('div', { class: 'stack' }, host, h('h3', { class: 'hub-title' }, 'Jobs given on a single date'), assignmentsTab(c)); } },
+      !canJp && { key: 'plans', label: 'Assignments', render: () => assignmentsTab(c) },
+      { key: 'results', label: 'Visits & results', render: () => sub([
         { key: 'visits', label: 'Visits', render: () => visitsTab(c) },
         { key: 'issues', label: 'Issues', render: () => issuesTab(c) },
-        { key: 'evidence', label: 'Evidence', render: () => evidenceTab(c) },
+        { key: 'evidence', label: 'Photos', render: () => evidenceTab(c) },
         can('reports.view') && { key: 'reports', label: 'Reports', render: () => reportsTab(c) },
-      ].filter(Boolean)));
+      ]) },
+    ].filter(Boolean));
+    return h('div', null, pageHead({ title: c.name, subtitle: `${c.client?.name || ''} · ${c.code}`, actions: [badge(c.status), edit, ...transitions] }), ws);
   });
 }
 
@@ -62,17 +72,39 @@ async function transition(c, status, reload) {
   try { await api.post(`campaigns/${c.id}/transition`, { status, reason: res.reason || null }); toast(`Campaign is now ${status}.`); reload(); } catch (e) { toastError(e); }
 }
 
-function overview(c) {
+function overview(c, plans, go) {
   const days = c.start_date && c.end_date ? Math.max(0, Math.round((new Date(c.end_date) - new Date(c.start_date)) / 86400000) + 1) : null;
   return h('div', { class: 'stack' },
+    nextSteps(c, plans, go),
     h('div', { class: 'grid cols-4' },
       miniStat('Activities', c.activities?.length ?? 0), miniStat('Locations', c.locations?.length ?? 0), miniStat('Teams', c.teams?.length ?? 0), miniStat('Staff', c.users?.length ?? 0)),
     h('div', { class: 'grid cols-2' },
-      card('Details', kv([['Client', c.client?.id ? h('a', { href: href(`/clients/${c.client.id}`) }, c.client.name) : c.client?.name], ['Code', h('span', { class: 'mono' }, c.code)], ['Type', c.campaign_type && titleCase(c.campaign_type)],
-        ['Status', badge(c.status)], ['Dates', `${fmtDate(c.start_date)} → ${fmtDate(c.end_date)}${days ? ` (${days} days)` : ''}`], ['Budget', c.budget ? fmtMoney(c.budget) : null]])),
+      card('Details', kv([['Client', c.client?.id ? h('a', { href: href(`/clients/${c.client.id}`) }, c.client.name) : c.client?.name], ['Code', h('span', { class: 'mono' }, c.code)], ['Category', c.campaign_type && titleCase(c.campaign_type)],
+        ['Status', badge(c.status)], ['Dates', h('span', null, `${fmtDate(c.start_date)} → ${fmtDate(c.end_date)}${days ? ` (${days} days)` : ''}`, daysLeft(c) && h('span', { class: ['small', daysLeft(c).tone], style: { marginLeft: '8px' } }, daysLeft(c).text))], ['Budget', c.budget ? fmtMoney(c.budget) : null]])),
+      card('Project setup', h('div', { class: 'stack sm' },
+        h('div', null, h('strong', null, c.template?.name || 'Custom'), h('span', { class: 'muted small' }, ' · how outlets are added and what agents do')),
+        settingsSummary(c.settings),
+        c.settings?.journey_plan && can('assignments.view') && h('button', { class: 'btn sm', type: 'button', onclick: () => go('plans') }, 'Manage journey plans'))),
       card('Brief', h('div', { class: 'stack sm' },
         h('div', null, h('strong', null, 'Description'), h('p', { style: { whiteSpace: 'pre-wrap' } }, c.description || h('span', { class: 'muted' }, 'Not provided.'))),
         h('div', null, h('strong', null, 'Objectives'), h('p', { style: { whiteSpace: 'pre-wrap' } }, c.objectives || h('span', { class: 'muted' }, 'Not provided.')))))));
+}
+/** A plain checklist of what is left before the project can run, each with a button to the place to do it. */
+function nextSteps(c, plans, go) {
+  if (c.status === 'archived' || c.status === 'completed') return null;
+  const jp = !!c.settings?.journey_plan;
+  const steps = [
+    { done: (c.activities?.length ?? 0) > 0, title: 'Add the activities', hint: 'What agents do on this project, for example Merchandising or Activation.', btn: 'Add activities', to: 'setup' },
+    { done: (c.locations?.length ?? 0) > 0, title: 'Add the outlets', hint: 'Choose which outlets belong to this project.', btn: 'Add outlets', to: 'outlets' },
+    { done: (c.users?.length ?? 0) > 0, title: 'Add the people', hint: 'Managers, team leaders and field agents who work on it.', btn: 'Add people', to: 'outlets' },
+    jp && { done: (plans ?? 0) > 0, title: 'Plan each agent\'s week', hint: 'Choose each agent\'s outlets and the days they visit them.', btn: 'Plan journeys', to: 'plans' },
+    { done: c.status === 'active', title: 'Activate the project', hint: 'Agents can only start visits once it is active (use the Activate button at the top).', btn: null },
+  ].filter(Boolean);
+  const left = steps.filter((x) => !x.done).length;
+  if (!left) return null;
+  return card(`Next steps · ${left} left`, h('div', { class: 'next-steps' }, steps.map((x, i) => h('div', { class: ['next-step', x.done && 'done'] },
+    h('span', { class: 'tick' }, x.done ? '✓' : String(i + 1)), h('span', { class: 'tx' }, h('b', null, x.title), h('span', null, x.hint)),
+    !x.done && x.btn && h('button', { class: 'btn sm', type: 'button', onclick: () => go(x.to) }, x.btn)))));
 }
 const miniStat = (label, value) => h('div', { class: 'card stat' }, h('div', { class: 'label' }, label), h('div', { class: 'value' }, fmtNumber(value)));
 
@@ -93,9 +125,9 @@ function activitiesTab(c, reload) {
   });
 }
 
-function resourcesTab(c, reload) {
+function resourcesTab(c, reload, go) {
   const canAssign = can('campaigns.assign') && c.status !== 'archived';
-  return h('div', { class: 'grid cols-2' }, LINKS.map((l) => {
+  return h('div', { class: 'stack' }, h('p', { class: 'muted' }, 'Who works on this project and where. To create new outlets, use ', h('a', { href: href('/locations') }, 'Outlets'), ' or ', h('a', { href: href('/onboarding') }, 'Start a project'), '; here you choose which ones belong to this project.'), h('div', { class: 'grid cols-2' }, LINKS.map((l) => {
     const items = c[l.rel] || [];
     const label = (i) => i.name + (l.rel === 'forms' && i.version ? ` (v${i.version})` : '') + (l.rel === 'locations' && i.town ? ` — ${i.town}` : '') + (l.rel === 'products' && i.sku ? ` · ${i.sku}` : '');
     return card(`${l.label} (${items.length})`, items.length
@@ -106,7 +138,7 @@ function resourcesTab(c, reload) {
         onSave: async (sel) => { await api.put(`campaigns/${c.id}/links/${l.rel}`, { ids: sel.map((s) => s.value) }); toast(`${l.label} updated.`); reload(); },
       }) }, icon('edit', { size: 14 }), 'Manage'),
     });
-  }));
+  })));
 }
 
 function kpiTab(c) {
@@ -154,6 +186,6 @@ function evidenceTab(c) {
 
 function reportsTab(c) {
   return card('Campaign reports', h('div', { class: 'stack sm' }, h('p', { class: 'muted' }, 'Open a report pre-filtered to this campaign.'),
-    h('div', { class: 'pill-row' }, ['campaign_performance', 'visit_completion', 'sales', 'osa', 'merchandising', 'attendance', 'issue_management', 'evidence'].map((t) =>
+    h('div', { class: 'pill-row' }, ['campaign_performance', 'visit_completion', ...(c.settings?.tasks?.sales ? ['sales'] : []), 'osa', 'merchandising', 'attendance', 'issue_management', 'evidence'].map((t) =>
       h('a', { class: 'btn sm', href: href(`/reports/${t}?campaign_id=${c.id}`) }, titleCase(t))))));
 }

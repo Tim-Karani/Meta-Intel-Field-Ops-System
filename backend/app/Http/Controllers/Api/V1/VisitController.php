@@ -36,6 +36,9 @@ class VisitController extends ApiController
                 $q->where("visits.$f", $v);
             }
         }
+        if ($focus = \App\Domain\Access\ProjectFocus::campaignIds($request->query())) {
+            $q->whereIn('visits.campaign_id', $focus);
+        }
         if ($from = $request->query('date_from')) {
             $q->where('visits.visit_date', '>=', $from);
         }

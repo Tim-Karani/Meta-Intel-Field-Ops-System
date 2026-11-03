@@ -23,6 +23,8 @@ class MerchandisingRecord extends Model
         'price_compliant',
         'competitor_present',
         'competitor_notes',
+        'our_facings',
+        'total_facings',
         'captured_at',
         'notes',
     ];

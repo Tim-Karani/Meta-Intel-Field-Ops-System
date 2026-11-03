@@ -1,4 +1,6 @@
-# Field Operations & Retail Execution Platform
+# MetaIntel Field Operation System
+
+**MetaIntel** (short: *MetaIntel FOS*, or just *MetaIntel*) is the field operations and retail execution platform of Meta Intel Technologies.
 
 Web side (Laravel 12 API + vanilla HTML/CSS/JS admin app) and the Flutter mobile app for field agents (`mobile/`).
 
@@ -8,7 +10,7 @@ Web side (Laravel 12 API + vanilla HTML/CSS/JS admin app) and the Flutter mobile
 | `web/` | Static web app (no build step, strict CSP, no inline script or style) |
 | `mobile/` | Flutter app for field agents, offline-first (see `mobile/README.md`) |
 | `docker/`, `docker-compose.yml` | PHP-FPM image, nginx (serves `web/`, proxies `/api`), Postgres, queue worker, scheduler |
-| `docs/` | Architecture, data model, RBAC, security, deployment, testing, decisions, API reference |
+| `docs/` | **Start with `PROJECT_SETUP.md`** (set up a new project step by step) and `FIELD_RULES.md`; also architecture, data model, RBAC, security, deployment, testing, decisions, API reference, CHANGELOG |
 | `legacy/` | The original visual template (React/Supabase), kept for reference only |
 
 ## Quick start (Docker)
@@ -40,3 +42,7 @@ against a real database yet.** Run `composer install && php artisan test` first 
 [Testing](docs/TESTING.md) · [Decisions](docs/DECISIONS.md) · [API reference](docs/API_REFERENCE.md) · [Mobile & sync](docs/MOBILE_APP.md)
 
 - Outlets without coordinates and field-added outlets: [docs/OUTLETS.md](docs/OUTLETS.md)
+
+
+## Project setup
+See [docs/PROJECT_SETUP.md](docs/PROJECT_SETUP.md) for project templates, permanent/reliever agents and fixed journey plans.

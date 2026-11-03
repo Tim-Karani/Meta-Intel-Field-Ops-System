@@ -19,6 +19,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class UserController extends ResourceController
 {
@@ -43,9 +44,14 @@ class UserController extends ResourceController
             'role' => [Rule::requiredIf($model === null), Rule::in(array_column(RoleEnum::cases(), 'value'))],
             'client_id' => ['nullable', 'uuid', new Accessible(\App\Models\Client::class)],
             'agent_type' => ['nullable', 'string', 'max:30'],
+            'employment_type' => ['nullable', Rule::in(\App\Domain\Projects\ProjectSettings::EMPLOYMENT)],
+            'can_add_outlets' => ['nullable', 'boolean'],
             'agent_code' => ['nullable', 'string', 'max:40', Rule::unique('agent_profiles', 'agent_code')->ignore($id, 'user_id')],
             'supervisor_id' => ['nullable', 'uuid', Rule::exists('users', 'id')],
+            'team_leader_id' => ['nullable', 'uuid', Rule::exists('users', 'id')],
             'region' => ['nullable', 'string', 'max:255'],
+            'pay_type' => ['nullable', Rule::in(['daily', 'hourly', 'monthly'])],
+            'pay_rate' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
         ];
     }
 
@@ -64,6 +70,7 @@ class UserController extends ResourceController
     protected function creating(array $data, Request $request): array
     {
         $this->assertRoleRules($data['role'] ?? null, $data['client_id'] ?? null);
+        $data = $this->resolveChain($data);
         if (empty($data['password'])) {
             $this->generatedPassword = $data['password'] = Str::password(14);
         }
@@ -75,10 +82,11 @@ class UserController extends ResourceController
     protected function afterCreate(Model $model, array $data, Request $request): void
     {
         $this->syncRole($model, $data);
-        if (($data['role'] ?? null) === RoleEnum::FieldAgent->value) {
+        if (in_array($data['role'] ?? null, [RoleEnum::FieldAgent->value, RoleEnum::TeamLeader->value], true)) {
             AgentProfile::query()->create([
-                'user_id' => $model->getKey(), 'agent_type' => $data['agent_type'] ?? 'merchandiser', 'agent_code' => $data['agent_code'] ?? null,
-                'supervisor_id' => $data['supervisor_id'] ?? null, 'region' => $data['region'] ?? null,
+                'user_id' => $model->getKey(), 'agent_type' => $data['agent_type'] ?? 'merchandiser', 'employment_type' => $data['employment_type'] ?? 'permanent', 'can_add_outlets' => (bool) ($data['can_add_outlets'] ?? false), 'agent_code' => $data['agent_code'] ?? null,
+                'supervisor_id' => $data['supervisor_id'] ?? null, 'team_leader_id' => $data['team_leader_id'] ?? null, 'region' => $data['region'] ?? null,
+                'pay_type' => $data['pay_type'] ?? 'daily', 'pay_rate' => $data['pay_rate'] ?? 0,
             ]);
         }
     }
@@ -95,12 +103,35 @@ class UserController extends ResourceController
             $this->syncRole($model, $data);
         }
         $model->unsetRelation('roles');
-        if ($model->hasRole(RoleEnum::FieldAgent)) {
+        if ($model->hasRole(RoleEnum::FieldAgent) || $model->hasRole(RoleEnum::TeamLeader)) {
+            $data = $this->resolveChain($data, $model);
             AgentProfile::query()->updateOrCreate(['user_id' => $model->getKey()], array_filter(
-                array_intersect_key($data, array_flip(['agent_type', 'agent_code', 'supervisor_id', 'region'])), fn ($v) => $v !== null
+                array_intersect_key($data, array_flip(['agent_type', 'employment_type', 'can_add_outlets', 'agent_code', 'supervisor_id', 'team_leader_id', 'region', 'pay_type', 'pay_rate'])), fn ($v) => $v !== null
             ));
         }
         $model->forgetPermissionCache();
+    }
+
+    /**
+     * Supervisor > Team Leader > Agent. The chosen Team Leader must really be a Team Leader and the Supervisor a Supervisor; an agent
+     * who has a Team Leader but no Supervisor inherits the Team Leader's Supervisor and region, so the chain is never half-filled.
+     */
+    private function resolveChain(array $data, ?Model $model = null): array
+    {
+        $isRole = fn (?string $id, string $slug) => $id && \App\Models\User::query()->whereKey($id)->whereHas('roles', fn ($r) => $r->where('slug', $slug))->exists();
+        if (!empty($data['supervisor_id']) && !$isRole($data['supervisor_id'], 'supervisor')) {
+            throw ValidationException::withMessages(['supervisor_id' => ['The chosen person is not a Supervisor.']]);
+        }
+        if (!empty($data['team_leader_id'])) {
+            if (!$isRole($data['team_leader_id'], 'team_leader')) {
+                throw ValidationException::withMessages(['team_leader_id' => ['The chosen person is not a Team Leader.']]);
+            }
+            $tl = AgentProfile::query()->find($data['team_leader_id']);
+            $data['supervisor_id'] ??= $tl?->supervisor_id;
+            $data['region'] ??= $tl?->region;
+        }
+
+        return $data;
     }
 
     public function store(Request $request): JsonResponse

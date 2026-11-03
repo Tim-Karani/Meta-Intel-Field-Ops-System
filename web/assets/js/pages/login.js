@@ -7,7 +7,7 @@ import { toast } from '../ui/feedback.js';
 
 export default async function render({ container, route, query, navigate }) {
   const mode = route.mode || 'login';
-  const appName = window.APP_CONFIG?.appName || 'Field Operations';
+  const appName = window.APP_CONFIG?.appName || 'MetaIntel';
   const alertBox = h('div', { class: 'hidden', role: 'alert' });
   const showAlert = (msg, kind = 'error') => { alertBox.className = `alert ${kind}`; alertBox.replaceChildren(icon(kind === 'ok' ? 'checkCircle' : 'alert'), h('div', null, msg)); };
 
@@ -57,7 +57,7 @@ export default async function render({ container, route, query, navigate }) {
 
   mount(container, h('div', { class: 'auth-wrap' },
     h('section', { class: 'auth-hero' },
-      h('div', { class: 'brand', style: { padding: 0, border: 0 } }, h('span', { class: 'brand-mark' }, icon('pin', { size: 18 })), h('span', null, appName)),
+      h('div', { class: 'brand', style: { padding: 0, border: 0 } }, h('span', { class: 'brand-mark' }, icon('pin', { size: 18 })), h('span', null, appName, h('small', { style: { display: 'block', fontWeight: 400, opacity: .75 } }, 'Field Operation System'))),
       h('div', null,
         h('h1', null, 'Run field execution with evidence, not guesswork.'),
         h('p', null, 'Plan campaigns, assign agents, verify visits with GPS and photos, and report to clients from one place.'),

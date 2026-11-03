@@ -30,6 +30,10 @@ class VisitDataController extends ApiController
     {
         $v = $this->visit($request, $visit);
         $this->authorize('work', $v);
+        $campaign = \App\Models\Campaign::query()->find($v->campaign_id);
+        if ($campaign && !\App\Domain\Projects\ProjectSettings::salesEnabled($campaign)) {
+            throw new \App\Support\DomainRuleException('This project does not record sales.', 'sales_not_enabled', 422);
+        }
         $payload = $request->validate([
             'client_uuid' => ['nullable', 'uuid'],
             'payment_method' => ['nullable', Rule::in(['cash', 'mpesa', 'card', 'credit', 'other'])],
@@ -95,6 +99,7 @@ class VisitDataController extends ApiController
             'shelf_position' => ['nullable', 'string', 'max:80'],
             'planogram_compliant' => ['nullable', 'boolean'], 'price_compliant' => ['nullable', 'boolean'],
             'competitor_present' => ['nullable', 'boolean'], 'competitor_notes' => ['nullable', 'string', 'max:1000'],
+            'our_facings' => ['nullable', 'integer', 'min:0', 'max:5000'], 'total_facings' => ['nullable', 'integer', 'min:0', 'max:5000', 'gte:our_facings'],
             'captured_at' => ['nullable', 'date', 'before_or_equal:+5 minutes'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);

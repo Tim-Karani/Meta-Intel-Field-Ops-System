@@ -26,7 +26,7 @@ class UploadSecurityTest extends DatabaseTestCase
 
     private function upload(UploadedFile $file)
     {
-        return $this->api('POST', "visits/{$this->visit}/photos", ['file' => $file]);
+        return $this->api('POST', "visits/{$this->visit}/photos", ['source' => 'camera', 'file' => $file]);
     }
 
     public function test_script_files_are_refused_even_when_renamed_to_images(): void
@@ -103,7 +103,7 @@ class UploadSecurityTest extends DatabaseTestCase
         $other = Scenario::form();
         $qid = $other->questions()->first()->id;
         $this->upload(UploadedFile::fake()->image('a.jpg'))->assertCreated();
-        $this->api('POST', "visits/{$this->visit}/photos", ['file' => UploadedFile::fake()->image('b.jpg'), 'question_id' => $qid])->assertStatus(422);
+        $this->api('POST', "visits/{$this->visit}/photos", ['source' => 'camera', 'file' => UploadedFile::fake()->image('b.jpg'), 'question_id' => $qid])->assertStatus(422);
     }
 
     public function test_reusing_the_same_photo_on_another_visit_raises_a_security_event(): void
@@ -118,7 +118,21 @@ class UploadSecurityTest extends DatabaseTestCase
             'assignment_id' => $this->s->assignmentA->id, 'campaign_id' => $this->s->campaignA->id, 'agent_id' => $this->s->agent->id,
             'location_id' => $this->s->locationA->id, 'status' => 'started', 'visit_date' => now()->toDateString(),
         ]);
-        $this->api('POST', "visits/{$second->id}/photos", ['file' => $file()])->assertCreated();
+        $this->api('POST', "visits/{$second->id}/photos", ['source' => 'camera', 'file' => $file()])->assertCreated();
         $this->assertDatabaseHas('security_events', ['type' => 'photo_reuse_detected']);
+    }
+
+    public function test_gallery_or_unlabelled_photos_are_refused(): void
+    {
+        $img = fn () => UploadedFile::fake()->image('g.jpg');
+        $this->api('POST', "visits/{$this->visit}/photos", ['file' => $img()])->assertStatus(422);
+        $this->api('POST', "visits/{$this->visit}/photos", ['source' => 'gallery', 'file' => $img()])->assertStatus(422);
+        $this->api('POST', "visits/{$this->visit}/photos", ['source' => 'camera', 'file' => $img()])->assertCreated();
+    }
+
+    public function test_a_photo_claiming_to_be_old_is_refused(): void
+    {
+        $this->api('POST', "visits/{$this->visit}/photos", ['source' => 'camera', 'captured_at' => now()->subDays(10)->toIso8601String(), 'file' => UploadedFile::fake()->image('o.jpg')])
+            ->assertStatus(422);
     }
 }

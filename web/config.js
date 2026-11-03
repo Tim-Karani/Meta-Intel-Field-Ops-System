@@ -2,7 +2,8 @@
 window.APP_CONFIG = {
   // Base URL of the Laravel API. A relative value works when nginx proxies /api to the backend.
   apiBase: '/api/v1',
-  appName: 'Field Operations',
+  appName: 'MetaIntel',
+  productName: 'MetaIntel Field Operation System',
   // Slippy-map tiles for location maps. Set to '' to draw markers without a basemap.
   mapTileUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
   mapAttribution: '© OpenStreetMap contributors',

@@ -18,7 +18,7 @@ class UserResource extends JsonResource
             'last_login_at' => $this->last_login_at?->toIso8601String(), 'created_at' => $this->created_at?->toIso8601String(),
             'roles' => $this->whenLoaded('roles', fn () => $this->roles->map(fn ($r) => ['slug' => $r->slug, 'name' => $r->name])->all()),
             'client' => $this->whenLoaded('client', fn () => $this->client ? ['id' => $this->client->id, 'name' => $this->client->name] : null),
-            'agent_profile' => $this->whenLoaded('agentProfile', fn () => $this->agentProfile?->only(['agent_type', 'agent_code', 'supervisor_id', 'region'])),
+            'agent_profile' => $this->whenLoaded('agentProfile', fn () => $this->agentProfile?->only(['agent_type', 'employment_type', 'can_add_outlets', 'agent_code', 'supervisor_id', 'team_leader_id', 'region', 'pay_type', 'pay_rate'])),
         ];
     }
 
@@ -27,6 +27,23 @@ class UserResource extends JsonResource
     {
         $user->loadMissing(['roles', 'client:id,name', 'agentProfile']);
 
-        return array_merge((new self($user))->resolve(), ['permissions' => $user->permissionSlugs(), 'scope_type' => $user->scopeType()]);
+        return array_merge((new self($user))->resolve(), ['permissions' => $user->permissionSlugs(), 'scope_type' => $user->scopeType(), 'features' => self::features($user)]);
+    }
+
+    /**
+     * What this installation's projects actually use, so the menu only shows screens that have data behind them.
+     * Sales (and stock) exist only when a project the user can see has the Sales task switched on.
+     */
+    public static function features(\App\Models\User $user): array
+    {
+        try {
+            $sales = \App\Domain\Access\AccessScope::scope(\App\Models\Campaign::query(), $user)
+                ->whereNotIn('campaigns.status', ['archived'])->pluck('campaigns.settings')
+                ->contains(fn ($s) => \App\Domain\Projects\ProjectSettings::normalize(is_string($s) ? json_decode($s, true) : (array) $s)['tasks']['sales']);
+        } catch (\Throwable) {
+            $sales = true;      // never hide a screen because the check failed
+        }
+
+        return ['sales' => $sales];
     }
 }

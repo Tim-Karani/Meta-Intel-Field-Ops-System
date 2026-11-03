@@ -22,7 +22,7 @@ An outlet (`locations` row) no longer needs coordinates up front.
 - Web list: filter **Position** = Not mapped yet / Needs confirmation / Mapped.
 
 ## Field-added outlets
-`POST /locations/field` (permission `locations.capture`, granted to Field Agents and System Admin):
+`POST /locations/field` (permission `locations.capture`, granted to Field Agents and Team Leaders):
 `location_id` and `assignment_id` are UUIDs generated on the phone, so the call is idempotent and the visit can reference
 them before anything has synced. The server creates the outlet, links it to the campaign, and gives the agent an
 **accepted** assignment for today (form chosen as for office-created assignments). Supervisors and campaign managers are notified.

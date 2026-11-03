@@ -16,10 +16,12 @@ trait FiltersByVisit
             'agent_id' => $this->filterValue($request, 'agent_id', true),
             'location_id' => $this->filterValue($request, 'location_id', true),
         ]);
+        $focus = \App\Domain\Access\ProjectFocus::campaignIds($request->query());
         $from = $request->query('date_from');
         $to = $request->query('date_to');
-        if ($visit || $from || $to) {
-            $query->whereHas('visit', function (Builder $v) use ($visit, $from, $to) {
+        if ($visit || $from || $to || $focus) {
+            $query->whereHas('visit', function (Builder $v) use ($visit, $from, $to, $focus) {
+                $focus && $v->whereIn('visits.campaign_id', $focus);
                 foreach ($visit as $col => $val) {
                     $v->where("visits.$col", $val);
                 }

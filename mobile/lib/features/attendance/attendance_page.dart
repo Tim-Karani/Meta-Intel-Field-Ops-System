@@ -43,7 +43,7 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
   }
 
   Future<void> _out() async {
-    final yes = await confirm(context, title: 'Clock out for the day?', message: 'Make sure your visits are submitted first.', yes: 'Clock out');
+    final yes = await confirm(context, title: 'Clock out for the day?', message: 'Make sure you have checked out of your last outlet and submitted your visits.', yes: 'Clock out');
     if (!yes) return;
     setState(() => _busy = true);
     try {
@@ -91,6 +91,15 @@ class _AttendancePageState extends ConsumerState<AttendancePage> {
           FilledButton.icon(onPressed: _busy ? null : _out, icon: const Icon(Icons.logout), label: const Text('Clock out'))
         else
           const AppCard(color: Color(0xFFE6F5EE), child: Text('Your day is complete. Well done.', style: TextStyle(fontWeight: FontWeight.w700))),
+        const SizedBox(height: 12),
+        const AppCard(
+          color: Brand.saffronSoft,
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Icon(Icons.info_outline, color: Brand.ink),
+            SizedBox(width: 10),
+            Expanded(child: Text('Clocking in only records that your day has started. Your working time counts from your first check-in at an outlet, and you can only check in within 200 m of the outlet.', style: TextStyle(fontWeight: FontWeight.w600))),
+          ]),
+        ),
         const SizedBox(height: 12),
         const Text('Clocking works offline. The time recorded is the time you tapped, and it is sent when you are online.', style: TextStyle(color: Brand.muted, fontSize: 12.5)),
       ]),

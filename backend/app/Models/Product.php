@@ -20,12 +20,18 @@ class Product extends Model
         'sku',
         'unit_price',
         'status',
+        'is_msl',
+        'sos_target_pct',
+        'pack_size',
+        'units_per_case',
     ];
 
     protected function casts(): array
     {
         return [
             'unit_price' => 'decimal:2',
+            'is_msl' => 'boolean',
+            'sos_target_pct' => 'decimal:2',
         ];
     }
 

@@ -49,6 +49,7 @@ class MerchPage extends ConsumerWidget {
                   _flag('POSM present', m['posm_present']),
                   if ((m.str('posm_type') ?? '').isNotEmpty) Text('POSM: ${m.str('posm_type')}', style: const TextStyle(color: Brand.muted)),
                   if ((m.str('shelf_position') ?? '').isNotEmpty) Text('Shelf: ${m.str('shelf_position')}', style: const TextStyle(color: Brand.muted)),
+                  if (m['our_facings'] != null && m['total_facings'] != null) Text('Share of shelf: ${m['our_facings']} of ${m['total_facings']} facings', style: const TextStyle(color: Brand.muted)),
                   _flag('Planogram followed', m['planogram_compliant']),
                   _flag('Price compliant', m['price_compliant']),
                   _flag('Competitor present', m['competitor_present'], goodWhen: false),
@@ -93,9 +94,13 @@ class _MerchSheetState extends State<_MerchSheet> {
   final _posmType = TextEditingController();
   final _position = TextEditingController();
   final _notes = TextEditingController();
+  final _ours = TextEditingController();
+  final _total = TextEditingController();
 
   @override
   void dispose() {
+    _ours.dispose();
+    _total.dispose();
     _posmType.dispose();
     _position.dispose();
     _notes.dispose();
@@ -121,13 +126,32 @@ class _MerchSheetState extends State<_MerchSheet> {
           if (_posm) TextField(controller: _posmType, decoration: const InputDecoration(labelText: 'POSM type (e.g. shelf strip, wobbler)')),
           const SizedBox(height: 8),
           TextField(controller: _position, decoration: const InputDecoration(labelText: 'Shelf position (e.g. eye level)')),
+          Row(children: [
+            Expanded(child: TextField(controller: _ours, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Our facings'))),
+            const SizedBox(width: 10),
+            Expanded(child: TextField(controller: _total, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'All facings on shelf'))),
+          ]),
+          const Padding(padding: EdgeInsets.only(top: 4), child: Text('Count the product facings on the shelf. This gives the share of shelf (SOS).', style: TextStyle(color: Brand.muted, fontSize: 12))),
           SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Planogram followed'), value: _planogram, onChanged: (v) => setState(() => _planogram = v)),
           SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Prices correct'), value: _price, onChanged: (v) => setState(() => _price = v)),
           SwitchListTile(contentPadding: EdgeInsets.zero, title: const Text('Competitor activity seen'), value: _competitor, onChanged: (v) => setState(() => _competitor = v)),
           if (_competitor) TextField(controller: _notes, maxLines: 2, decoration: const InputDecoration(labelText: 'What did you see?')),
           const SizedBox(height: 12),
           FilledButton(
-            onPressed: () => Navigator.pop(context, {
+            onPressed: () {
+              final ours = int.tryParse(_ours.text.trim());
+              final total = int.tryParse(_total.text.trim());
+              if ((ours == null) != (total == null)) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter both our facings and all facings, or leave both empty.')));
+                return;
+              }
+              if (ours != null && total != null && ours > total) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Our facings cannot be more than all facings.')));
+                return;
+              }
+              Navigator.pop(context, {
+              if (ours != null) 'our_facings': ours,
+              if (total != null) 'total_facings': total,
               if (_product != null) 'product_id': _product,
               'posm_present': _posm,
               if (_posm && _posmType.text.trim().isNotEmpty) 'posm_type': _posmType.text.trim(),
@@ -137,7 +161,8 @@ class _MerchSheetState extends State<_MerchSheet> {
               'competitor_present': _competitor,
               if (_competitor && _notes.text.trim().isNotEmpty) 'competitor_notes': _notes.text.trim(),
               'captured_at': nowIso(),
-            }),
+            });
+            },
             child: const Text('Save record'),
           ),
         ]),

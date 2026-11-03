@@ -10,6 +10,8 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../app/theme.dart';
 import '../../core/config.dart';
+import '../../core/location_service.dart';
+import '../../core/photo_stamp.dart';
 import '../../core/util.dart';
 import '../../models/local_visit.dart';
 import '../../state/providers.dart';
@@ -25,50 +27,64 @@ Future<File> _persist(String sourcePath, {String ext = '.jpg'}) async {
   return File(sourcePath).copy(target.path);
 }
 
-/// Takes (or picks) one photo for a visit. [liveOnly] forces the camera - used when the form requires live capture.
+/// A photo that was just taken, stamped and copied to the app's own storage, ready to be attached to a visit.
+class CapturedPhoto {
+  const CapturedPhoto(this.file, this.gps);
+  final File file;
+  final GpsReading? gps;
+}
+
+/// Opens the camera (never the gallery), checks the file was written just now, stamps it and keeps a copy in the app's
+/// storage. [front] opens the selfie camera (used for check-in/check-out proof). Returns null when cancelled or refused.
+Future<CapturedPhoto?> takeStampedPhoto(
+  BuildContext context,
+  WidgetRef ref,
+  LocalVisit visit, {
+  bool front = false,
+  String? title,
+}) async {
+  try {
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.camera,
+      preferredCameraDevice: front ? CameraDevice.front : CameraDevice.rear,
+      maxWidth: AppConfig.photoMaxEdge,
+      maxHeight: AppConfig.photoMaxEdge,
+      imageQuality: AppConfig.photoQuality,
+    );
+    if (picked == null) return null;
+    final age = DateTime.now().difference(await File(picked.path).lastModified());
+    if (age > const Duration(minutes: 3) || age < const Duration(minutes: -3)) {
+      if (context.mounted) toast(context, 'That photo was not taken just now, so it was not accepted. Take a new photo with the camera.', error: true);
+      return null;
+    }
+    // Stamp first (date/time, GPS, outlet, agent), then keep a copy in the app's own storage.
+    final takenAt = DateTime.now();
+    final gps = await ref.read(locationServiceProvider).lastKnown();
+    final outlet = (await ref.read(repoProvider).assignment(visit.assignmentId))?.locationName ?? 'Outlet';
+    await stampPhoto(picked.path, stampLines(takenAt: takenAt, gps: gps, outlet: outlet, agent: ref.read(sessionProvider).userName, title: title));
+    return CapturedPhoto(await _persist(picked.path, ext: '.jpg'), gps);
+  } catch (e) {
+    if (context.mounted) toast(context, 'Could not use the camera: $e', error: true);
+    return null;
+  }
+}
+
+/// Takes one evidence photo with the camera. There is deliberately NO gallery option: evidence has to be captured live at the
+/// outlet, so an agent cannot attach an old or downloaded picture. Two checks back this up:
+///  * the file the camera returns must have been written in the last few minutes (a stale file is refused), and
+///  * the upload is labelled `source=camera`; the server refuses anything else, and also flags a photo that was already
+///    used on another visit (same image fingerprint).
 Future<bool> captureEvidence(
   BuildContext context,
   WidgetRef ref,
   LocalVisit visit, {
   String? questionId,
-  bool liveOnly = true,
 }) async {
-  var source = ImageSource.camera;
-  if (!liveOnly) {
-    final chosen = await showModalBottomSheet<ImageSource>(
-      context: context,
-      builder: (c) => SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          ListTile(leading: const Icon(Icons.photo_camera_outlined), title: const Text('Take a photo'), onTap: () => Navigator.pop(c, ImageSource.camera)),
-          ListTile(leading: const Icon(Icons.photo_library_outlined), title: const Text('Choose from gallery'), onTap: () => Navigator.pop(c, ImageSource.gallery)),
-        ]),
-      ),
-    );
-    if (chosen == null) return false;
-    source = chosen;
-  }
-  try {
-    final picked = await ImagePicker().pickImage(
-      source: source,
-      maxWidth: AppConfig.photoMaxEdge,
-      maxHeight: AppConfig.photoMaxEdge,
-      imageQuality: AppConfig.photoQuality,
-    );
-    if (picked == null) return false;
-    final file = await _persist(picked.path, ext: _extOf(picked.path));
-    final gps = await ref.read(locationServiceProvider).lastKnown();
-    await ref.read(repoProvider).addPhoto(visit.localId, file, questionId: questionId, gps: gps);
-    if (context.mounted) toast(context, 'Photo saved. It will upload when you are online.');
-    return true;
-  } catch (e) {
-    if (context.mounted) toast(context, 'Could not capture the photo: $e', error: true);
-    return false;
-  }
-}
-
-String _extOf(String path) {
-  final e = p.extension(path).toLowerCase();
-  return const ['.jpg', '.jpeg', '.png', '.webp'].contains(e) ? e : '.jpg';
+  final shot = await takeStampedPhoto(context, ref, visit);
+  if (shot == null) return false;
+  await ref.read(repoProvider).addPhoto(visit.localId, shot.file, questionId: questionId, gps: shot.gps);
+  if (context.mounted) toast(context, 'Photo saved with its time and place. It will upload when you are online.');
+  return true;
 }
 
 /// A finger-drawn signature, saved as a PNG "signature" evidence item.
@@ -202,10 +218,10 @@ class PhotoGrid extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
-                child: Text((ph['uploaded'] as int? ?? 0) == 1 ? 'Uploaded' : 'Waiting', style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700)),
+                child: Text('${_kindLabel(ph['kind'])}${(ph['uploaded'] as int? ?? 0) == 1 ? 'Uploaded' : 'Waiting'}', style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700)),
               ),
             ),
-            if (canDelete)
+            if (canDelete && !_isProof(ph['kind']))
               Positioned(
                 right: 2,
                 top: 2,
@@ -218,6 +234,9 @@ class PhotoGrid extends StatelessWidget {
       ],
     );
   }
+
+  static bool _isProof(Object? kind) => kind == 'checkin' || kind == 'checkout';
+  static String _kindLabel(Object? kind) => kind == 'checkin' ? 'Check-in - ' : (kind == 'checkout' ? 'Check-out - ' : '');
 
   Widget _thumb(Map<String, Object?> ph) {
     final path = ph['path'] as String?;

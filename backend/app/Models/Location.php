@@ -16,6 +16,19 @@ class Location extends Model
     protected $fillable = [
         'client_id',
         'territory_id',
+        'channel_id',
+        'outlet_subtype_id',
+        'outlet_status_id',
+        'distributor_id',
+        'geo_area_id',
+        'phone',
+        'email',
+        'shop_no',
+        'market_name',
+        'setting',
+        'region',
+        'locality',
+        'distributor',
         'name',
         'code',
         'type',
@@ -60,6 +73,26 @@ class Location extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+    public function outletSubtype(): BelongsTo
+    {
+        return $this->belongsTo(OutletSubtype::class);
+    }
+    public function outletStatus(): BelongsTo
+    {
+        return $this->belongsTo(OutletStatus::class);
+    }
+    public function distributor(): BelongsTo
+    {
+        return $this->belongsTo(Distributor::class);
+    }
+    public function geoArea(): BelongsTo
+    {
+        return $this->belongsTo(GeoArea::class);
+    }
+    public function channel(): BelongsTo
+    {
+        return $this->belongsTo(Channel::class);
     }
     public function territory(): BelongsTo
     {

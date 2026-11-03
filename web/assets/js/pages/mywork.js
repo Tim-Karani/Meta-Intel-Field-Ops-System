@@ -8,7 +8,7 @@ import { navigate } from '../core/router.js';
 
 export default async function render({ container }) {
   container.append(pageHead({ title: 'My work', subtitle: 'Your assignments for today and the days ahead.' }),
-    h('div', { class: 'alert info', style: { marginBottom: '16px' } }, icon('info'), h('div', null, 'Visits are captured in the Field Operations mobile app (GPS check-in, forms, photos, offline). This page lets you review and accept your assignments and follow up on submitted visits.')));
+    h('div', { class: 'alert info', style: { marginBottom: '16px' } }, icon('info'), h('div', null, 'Visits are captured in the MetaIntel mobile app (GPS check-in, forms, photos, offline). This page lets you review and accept your assignments and follow up on submitted visits.')));
   const host = h('div'); container.append(host);
   asyncView(host, async () => {
     const from = today();

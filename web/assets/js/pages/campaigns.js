@@ -5,18 +5,30 @@ import { href, navigate } from '../core/router.js';
 import { fmtDate, fmtMoney, fmtNumber } from '../core/format.js';
 import { lookup, enumOptions } from '../core/lookups.js';
 import { CAMPAIGN_TYPES } from '../core/constants.js';
+import { daysLeft } from '../core/format.js';
+import { loadTemplates, setupFields, fromSettings, toBody, wireTemplate } from '../ui/project-setup.js';
 
-export const campaignFields = (rec) => [
-  { name: 'client_id', label: 'Client', type: 'select', required: true, options: [], disabled: false, _load: () => lookup('clients') },
-  { name: 'code', label: 'Campaign code', required: true, maxlength: 40, help: 'Letters, numbers, dots, dashes or underscores.' },
-  { name: 'name', label: 'Campaign name', required: true, full: true },
-  { name: 'campaign_type', label: 'Type', type: 'select', options: CAMPAIGN_TYPES },
-  { name: 'budget', label: 'Budget (KES)', type: 'decimal', min: 0 },
-  { name: 'start_date', label: 'Start date', type: 'date' },
-  { name: 'end_date', label: 'End date', type: 'date' },
-  { name: 'description', label: 'Description', type: 'textarea', full: true },
-  { name: 'objectives', label: 'Objectives', type: 'textarea', full: true },
+const D = 'Details';
+export const campaignFields = (rec, setup = []) => [
+  { name: 'client_id', label: 'Client', type: 'select', required: true, options: [], disabled: false, _load: () => lookup('clients'), tab: D },
+  { name: 'code', label: 'Campaign code', required: true, maxlength: 40, help: 'Letters, numbers, dots, dashes or underscores.', tab: D },
+  { name: 'name', label: 'Campaign name', required: true, full: true, tab: D },
+  { name: 'campaign_type', label: 'Campaign category', type: 'select', options: CAMPAIGN_TYPES, tab: D, help: 'A label for grouping and filtering. How the project runs is set under "How it runs".' },
+  { name: 'budget', label: 'Budget (KES)', type: 'decimal', min: 0, tab: D },
+  { name: 'start_date', label: 'Start date', type: 'date', tab: D, help: 'Visits and assignments cannot be created before this date.' },
+  { name: 'end_date', label: 'End date', type: 'date', tab: D, help: 'Visits and assignments cannot be created after this date.' },
+  { name: 'description', label: 'Description', type: 'textarea', full: true, tab: D },
+  { name: 'objectives', label: 'Objectives', type: 'textarea', full: true, tab: D },
+  ...setup,
 ];
+
+/** Everything the campaign form needs from the API: templates and the setup fields built from them. */
+export async function loadSetup(rec) {
+  const templates = await loadTemplates().catch(() => []);
+  return { templates, setup: await setupFields(templates, { required: !rec }) };
+}
+export const campaignValues = (c) => ({ ...c, ...fromSettings(c.settings), template_id: c.template_id || '' });
+export { toBody as campaignBody, wireTemplate };
 
 /** Selects whose options come from the API: fill them after the form is built. */
 export async function withLoadedOptions(fields) {
@@ -26,16 +38,19 @@ export async function withLoadedOptions(fields) {
 export default async function render({ container }) {
   const clients = await lookup('clients').catch(() => []);
   const statuses = await enumOptions('campaign_status').catch(() => []);
+  const { templates, setup } = await loadSetup(null);
   container.append(crudPage({
     title: 'Campaigns', subtitle: 'Plan, activate and track field campaigns.', noun: 'campaign', endpoint: 'campaigns',
     perms: { create: 'campaigns.create', edit: 'campaigns.edit', delete: 'campaigns.edit' }, defaultSort: '-created_at', searchPlaceholder: 'Search by name or code…',
-    fields: (rec) => campaignFields(rec).map((f) => (f.name === 'client_id' ? { ...f, options: clients } : f)),
-    toPayload: (v) => { const o = { ...v }; if (o.budget === null) delete o.budget; return o; },
+    formSize: 'lg', toValues: campaignValues,
+    fields: (rec) => campaignFields(rec, setup.map((f) => (f.name === 'template_id' ? { ...f, required: !rec } : f))).map((f) => (f.name === 'client_id' ? { ...f, options: clients } : f)),
+    onForm: (form) => wireTemplate(form, templates),
+    toPayload: (v) => { const o = toBody(v); if (o.budget === null) delete o.budget; return o; },
     filters: [{ key: 'status', label: 'All statuses', options: statuses }, { key: 'client_id', label: 'All clients', options: clients }],
     columns: [
-      { key: 'name', label: 'Campaign', sort: 'name', render: (r) => h('div', null, h('a', { href: href(`/campaigns/${r.id}`) }, h('strong', null, r.name)), h('div', { class: 'small muted' }, h('span', { class: 'mono' }, r.code), ' · ', r.client?.name)) },
+      { key: 'name', label: 'Campaign', sort: 'name', render: (r) => h('div', null, h('a', { href: href(`/campaigns/${r.id}`) }, h('strong', null, r.name)), h('div', { class: 'small muted' }, h('span', { class: 'mono' }, r.code), ' · ', r.client?.name, r.template?.name && ` · ${r.template.name}`)) },
       { key: 'status', label: 'Status', sort: 'status', render: (r) => badge(r.status) },
-      { key: 'dates', label: 'Dates', sort: 'start_date', render: (r) => `${fmtDate(r.start_date)} → ${fmtDate(r.end_date)}` },
+      { key: 'dates', label: 'Dates', sort: 'start_date', render: (r) => h('div', null, `${fmtDate(r.start_date)} → ${fmtDate(r.end_date)}`, daysLeft(r) && h('div', { class: ['small', daysLeft(r).tone] }, daysLeft(r).text)) },
       { key: 'budget', label: 'Budget', align: 'right', render: (r) => (r.budget ? fmtMoney(r.budget) : '—') },
       { key: 'scale', label: 'Scale', render: (r) => h('span', { class: 'small muted' }, `${fmtNumber(r.activities_count)} activities · ${fmtNumber(r.locations_count)} locations · ${fmtNumber(r.users_count)} staff`) },
     ],

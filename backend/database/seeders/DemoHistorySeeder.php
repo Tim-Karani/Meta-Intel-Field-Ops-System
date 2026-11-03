@@ -176,16 +176,20 @@ class DemoHistorySeeder extends Seeder
         }
         $visits->saveResponses($visit, $answers);
 
+        $ourFacings = 0;
         foreach ($products as $p) {
             $available = $stocked && mt_rand(1, 100) <= 85;
+            $facings = $available ? mt_rand(1, 6) : 0;
+            $ourFacings += $facings;
             $data->saveOsa($visit, [
-                'product_id' => $p->id, 'available' => $available, 'facings' => $available ? mt_rand(1, 6) : 0,
+                'product_id' => $p->id, 'available' => $available, 'facings' => $facings,
                 'price_on_shelf' => $p->unit_price + (mt_rand(1, 10) === 1 ? 10 : 0), 'display_compliant' => $available && mt_rand(1, 100) <= 80,
             ]);
         }
         $data->addMerchandising($visit, [
             'posm_present' => mt_rand(1, 100) <= 70, 'posm_type' => 'shelf_strip', 'planogram_compliant' => mt_rand(1, 100) <= 75,
             'price_compliant' => mt_rand(1, 100) <= 85, 'competitor_present' => mt_rand(1, 100) <= 60,
+            'our_facings' => $ourFacings, 'total_facings' => $ourFacings + mt_rand(8, 40),
         ]);
         if (mt_rand(1, 100) <= 40) {
             $items = collect($products)->shuffle()->take(mt_rand(1, 3))->map(fn ($p) => ['product_id' => $p->id, 'quantity' => mt_rand(2, 24)])->all();

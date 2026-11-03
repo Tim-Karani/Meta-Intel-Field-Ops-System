@@ -24,6 +24,8 @@ export const session = {
 
 export const can = (perm) => !!state.user?.permissions?.includes(perm);
 export const canAny = (...perms) => perms.flat().some(can);
+/** False only when the server says no project uses this feature (e.g. sales on a merchandising-only installation). */
+export const hasFeature = (name) => state.user?.features?.[name] !== false;
 export const scopeType = () => state.user?.scope_type || 'none';
 export const isClientUser = () => scopeType() === 'client';
 export const isFieldAgent = () => scopeType() === 'own';

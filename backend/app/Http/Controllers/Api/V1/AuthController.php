@@ -66,6 +66,7 @@ class AuthController extends ApiController
         Auth::setUser($user);
         AuditService::record('login', 'auth', $user);
         SecurityEvents::log('login_success', $user->getKey());
+        try { \App\Domain\Access\DeviceRegistry::touch($user, $request); } catch (\Throwable $e) { report($e); }   // never block a sign-in
 
         return $this->ok($this->tokenPayload($user, $data['device_name'] ?? 'web'), 'Signed in.');
     }

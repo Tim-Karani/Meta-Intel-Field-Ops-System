@@ -15,7 +15,7 @@ const position = () => new Promise((resolve) => {
 
 export default async function render({ container }) {
   let table;
-  container.append(pageHead({ title: 'Attendance', subtitle: 'Daily clock-in and clock-out records.' }));
+  container.append(pageHead({ title: 'Attendance', subtitle: 'Clocking in is only a record of the day starting. Time worked starts at the first outlet check-in.' }));
   if (can('attendance.create')) {
     const host = h('div', { style: { marginBottom: '16px' } });
     container.append(host);
@@ -34,9 +34,11 @@ export default async function render({ container }) {
     columns: [
       { key: 'attendance_date', label: 'Date', sort: 'attendance_date', render: (r) => fmtDate(r.attendance_date) },
       { key: 'user', label: 'Agent', render: (r) => r.user?.name || '—' },
-      { key: 'clock_in_at', label: 'In', sort: 'clock_in_at', render: (r) => fmtTime(r.clock_in_at) },
-      { key: 'clock_out_at', label: 'Out', render: (r) => (r.clock_out_at ? fmtTime(r.clock_out_at) : h('span', { class: 'muted' }, '—')) },
-      { key: 'hours', label: 'Hours', align: 'right', render: (r) => (r.clock_in_at && r.clock_out_at ? ((new Date(r.clock_out_at) - new Date(r.clock_in_at)) / 3600000).toFixed(1) : '—') },
+      { key: 'clock_in_at', label: 'Clocked in', sort: 'clock_in_at', render: (r) => (r.clock_in_at ? fmtTime(r.clock_in_at) : h('span', { class: 'muted' }, '—')) },
+      { key: 'work_started_at', label: 'Work started (first outlet)', render: (r) => (r.work_started_at ? h('strong', null, fmtTime(r.work_started_at)) : h('span', { class: 'muted' }, 'No outlet check-in')) },
+      { key: 'work_ended_at', label: 'Last check-out', render: (r) => (r.work_ended_at ? fmtTime(r.work_ended_at) : h('span', { class: 'muted' }, '—')) },
+      { key: 'worked_minutes', label: 'Time worked', align: 'right', render: (r) => (r.worked_minutes == null ? '—' : `${Math.floor(r.worked_minutes / 60)}h ${String(r.worked_minutes % 60).padStart(2, '0')}m`) },
+      { key: 'outlets_visited', label: 'Outlets', align: 'right' },
       { key: 'status', label: 'Status', sort: 'status', render: (r) => badge(r.status) },
     ],
     emptyTitle: 'No attendance records',

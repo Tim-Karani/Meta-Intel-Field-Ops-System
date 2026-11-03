@@ -20,9 +20,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class ReportService
 {
+    use ShelfReports;
+
     public const TYPES = [
         'campaign_performance' => 'Campaign performance',
         'attendance' => 'Attendance',
+        'checkin' => 'Outlet check-ins',
+        'sos' => 'Share of shelf (SOS)',
         'agent_performance' => 'Agent performance',
         'supervisor_performance' => 'Supervisor performance',
         'visit_completion' => 'Visit completion',
@@ -34,6 +38,15 @@ class ReportService
         'evidence' => 'Evidence quality',
         'activity_performance' => 'Activity performance',
         'territory_performance' => 'Territory performance',
+        'osa_by_channel' => 'OSA by channel',
+        'osa_by_category' => 'OSA by category',
+        'osa_by_outlet' => 'OSA by outlet',
+        'osa_by_product' => 'OSA by product',
+        'sos_by_channel' => 'Share of shelf by channel',
+        'sos_by_category' => 'Share of shelf by category',
+        'sos_by_outlet' => 'Share of shelf by outlet',
+        'sos_by_product' => 'Share of shelf by product',
+        'outlets_not_visited' => 'Outlets not visited',
     ];
 
     /** @return array{type:string,title:string,columns:list<array>,rows:list<array>,summary:array,approved_only:bool} */
@@ -44,8 +57,9 @@ class ReportService
         }
         $approvedOnly = $approvedOnly || $user->scopeType() === 'client';
         [$columns, $rows, $summary] = $this->{'report'.str_replace('_', '', ucwords($type, '_'))}($user, $f, $approvedOnly);
+        $targets = $this->applyTargets($type, $f, $user, $columns, $rows, $summary);
 
-        return ['type' => $type, 'title' => self::TYPES[$type], 'columns' => $columns, 'rows' => $rows, 'summary' => $summary, 'approved_only' => $approvedOnly];
+        return ['type' => $type, 'title' => self::TYPES[$type], 'columns' => $columns, 'rows' => $rows, 'summary' => $summary, 'approved_only' => $approvedOnly, 'targets' => $targets];
     }
 
     /* ----------------------------------------------------------------- base queries */
@@ -84,6 +98,7 @@ class ReportService
             ->when($f['activity_id'] ?? null, fn ($q, $v) => $q->where("$a.activity_id", $v))
             ->when($f['agent_id'] ?? null, fn ($q, $v) => $q->where($agentCol, $v))
             ->when($f['location_id'] ?? null, fn ($q, $v) => $q->where("$a.location_id", $v))
+            ->when($f['channel_id'] ?? null, fn ($q, $v) => $q->where('l.channel_id', $v))
             ->when($f['territory_id'] ?? null, fn ($q, $v) => $q->where('l.territory_id', $v))
             ->when($f['route_id'] ?? null, fn ($q, $v) => $q->whereIn("$a.location_id", DB::table('route_locations')->where('route_id', $v)->select('location_id')))
             ->when($f['team_id'] ?? null, fn ($q, $v) => $q->whereIn($agentCol, DB::table('team_members')->where('team_id', $v)->select('user_id')))
@@ -101,6 +116,37 @@ class ReportService
     }
 
     /* ----------------------------------------------------------------- reports */
+
+    /** The chosen project's goals, set against the numbers this report just produced. Null when no single project is chosen or none is set. */
+    private function applyTargets(string $type, array $f, User $user, array &$columns, array &$rows, array &$summary): ?array
+    {
+        $campaignId = $f['campaign_id'] ?? null;
+        if (!$campaignId || !\App\Domain\Access\AccessScope::scope(\App\Models\Campaign::query(), $user)->whereKey($campaignId)->exists()) {
+            return null;
+        }
+        $t = \App\Domain\Projects\ProjectSettings::targetsFor($campaignId);
+        if (!array_filter($t, fn ($v) => $v !== null)) {
+            return null;
+        }
+        if (str_starts_with($type, 'osa_by_') && $t['osa_pct'] !== null) {
+            $columns[] = $this->col('osa_gap', 'Gap to target', 'decimal');
+            foreach ($rows as &$r) {
+                $r['osa_gap'] = $r['osa'] !== null ? round($r['osa'] - $t['osa_pct'], 1) : null;
+            }
+            unset($r);
+            $summary['osa_target'] = $t['osa_pct'];
+            $summary['meets_target'] = $summary['osa'] !== null ? $summary['osa'] >= $t['osa_pct'] : null;
+        }
+        if (str_starts_with($type, 'sos_by_') && $t['sos_pct'] !== null) {
+            $summary['sos_target'] = $t['sos_pct'];
+        }
+        if ($type === 'outlets_not_visited' && $t['coverage_pct'] !== null) {
+            $summary['coverage_target'] = $t['coverage_pct'];
+            $summary['meets_target'] = $summary['coverage'] !== null ? $summary['coverage'] >= $t['coverage_pct'] : null;
+        }
+
+        return $t;
+    }
 
     private function reportCampaignPerformance(User $u, array $f, bool $approved): array
     {
@@ -149,7 +195,7 @@ class ReportService
             ->when($f['team_id'] ?? null, fn ($q, $v) => $q->whereIn('at.user_id', DB::table('team_members')->where('team_id', $v)->select('user_id')))
             ->when($f['supervisor_id'] ?? null, fn ($q, $v) => $q->whereIn('at.user_id', DB::table('agent_profiles')->where('supervisor_id', $v)->select('user_id')))
             ->groupBy('at.user_id')
-            ->selectRaw("at.user_id, count(*) filter (where at.status = 'present') as present, count(*) filter (where at.status = 'late') as late, count(*) filter (where at.status = 'absent') as absent, avg(extract(epoch from (at.clock_out_at - at.clock_in_at)) / 3600) as avg_hours")
+            ->selectRaw("at.user_id, count(*) filter (where at.work_started_at is not null) as worked_days, count(*) filter (where at.work_started_at is not null and at.status = 'late') as late, count(*) filter (where at.work_started_at is null and at.clock_in_at is not null) as clocked_only, avg(at.worked_minutes) filter (where at.worked_minutes is not null) / 60.0 as avg_hours, sum(at.outlets_visited) as outlets")
             ->get()->keyBy('user_id');
 
         $days = $this->assignmentBase($u, $f)->where('a.scheduled_date', '<=', now()->toDateString())->groupBy('a.agent_id')
@@ -159,17 +205,20 @@ class ReportService
         $names = DB::table('users')->whereIn('id', $ids)->pluck('name', 'id');
         $rows = $ids->map(function ($id) use ($att, $days, $names) {
             $a = $att[$id] ?? null;
-            $worked = (int) ($a->present ?? 0) + (int) ($a->late ?? 0);
+            // A day only counts as worked when the agent checked in at an outlet; clocking in alone is not time worked.
+            $worked = (int) ($a->worked_days ?? 0);
             return [
-                'agent' => $names[$id] ?? '—', 'assigned_days' => (int) ($days[$id] ?? 0), 'present' => (int) ($a->present ?? 0), 'late' => (int) ($a->late ?? 0),
-                'absent' => max((int) ($a->absent ?? 0), max(0, (int) ($days[$id] ?? 0) - $worked)),
+                'agent' => $names[$id] ?? '—', 'assigned_days' => (int) ($days[$id] ?? 0), 'present' => $worked, 'late' => (int) ($a->late ?? 0),
+                'clocked_only' => (int) ($a->clocked_only ?? 0), 'outlets' => (int) ($a->outlets ?? 0),
+                'absent' => max(0, (int) ($days[$id] ?? 0) - $worked),
                 'attendance_rate' => self::pct($worked, $days[$id] ?? 0), 'avg_hours' => isset($a->avg_hours) ? round((float) $a->avg_hours, 1) : null,
             ];
         })->sortBy('agent')->values()->all();
 
         return [[
-            $this->col('agent', 'Agent', 'text'), $this->col('assigned_days', 'Assigned days'), $this->col('present', 'Present'), $this->col('late', 'Late'),
-            $this->col('absent', 'Absent'), $this->col('attendance_rate', 'Attendance rate', 'percent'), $this->col('avg_hours', 'Avg hours on duty', 'decimal'),
+            $this->col('agent', 'Agent', 'text'), $this->col('assigned_days', 'Assigned days'), $this->col('present', 'Days worked (outlet check-in)'), $this->col('late', 'Late start'),
+            $this->col('clocked_only', 'Clocked in, no outlet'), $this->col('outlets', 'Outlets visited'),
+            $this->col('absent', 'Absent'), $this->col('attendance_rate', 'Attendance rate', 'percent'), $this->col('avg_hours', 'Avg hours worked (first check-in to last check-out)', 'decimal'),
         ], $rows, ['agents' => count($rows)]];
     }
 
@@ -290,6 +339,51 @@ class ReportService
         ], $rows, ['records' => array_sum(array_column($rows, 'records'))]];
     }
 
+    /** One row per outlet check-in: who, where, when, how far from the outlet, GPS outcome and whether both photos exist. */
+    private function reportCheckin(User $u, array $f, bool $approved): array
+    {
+        $tz = config('app.timezone');
+        $rows = $this->visitBase($u, $f, $approved)->join('visit_checkins as vc', 'vc.visit_id', '=', 'v.id')->whereNotNull('v.started_at')
+            ->orderBy('v.started_at')
+            ->selectRaw("v.visit_date, ag.name as agent, l.name as location, c.name as campaign, v.started_at, v.completed_at, vc.distance_m, vc.mock_flag, v.gps_outcome,
+                exists (select 1 from photos p where p.visit_id = v.id and p.kind = 'checkin') as has_in,
+                exists (select 1 from photos p where p.visit_id = v.id and p.kind = 'checkout') as has_out")
+            ->get()->map(fn ($r) => [
+                'date' => (string) $r->visit_date, 'agent' => $r->agent, 'location' => $r->location, 'campaign' => $r->campaign,
+                'checked_in' => \Carbon\Carbon::parse($r->started_at)->setTimezone($tz)->format('H:i'),
+                'checked_out' => $r->completed_at ? \Carbon\Carbon::parse($r->completed_at)->setTimezone($tz)->format('H:i') : null,
+                'minutes' => $r->completed_at ? (int) round(\Carbon\Carbon::parse($r->started_at)->diffInSeconds(\Carbon\Carbon::parse($r->completed_at)) / 60) : null,
+                'distance_m' => $r->distance_m !== null ? round((float) $r->distance_m) : null, 'gps' => $r->gps_outcome,
+                'checkin_photo' => (bool) $r->has_in, 'checkout_photo' => (bool) $r->has_out,
+            ])->all();
+
+        return [[
+            $this->col('date', 'Date', 'text'), $this->col('agent', 'Agent', 'text'), $this->col('location', 'Outlet', 'text'), $this->col('campaign', 'Campaign', 'text'),
+            $this->col('checked_in', 'Checked in', 'text'), $this->col('checked_out', 'Checked out', 'text'), $this->col('minutes', 'Minutes at outlet'),
+            $this->col('distance_m', 'Distance from outlet (m)'), $this->col('gps', 'GPS', 'text'), $this->col('checkin_photo', 'Check-in photo', 'bool'), $this->col('checkout_photo', 'Check-out photo', 'bool'),
+        ], $rows, ['check_ins' => count($rows), 'without_checkin_photo' => count(array_filter($rows, fn ($r) => !$r['checkin_photo'])), 'without_checkout_photo' => count(array_filter($rows, fn ($r) => !$r['checkout_photo']))]];
+    }
+
+    /** Share of shelf = our facings / all facings counted, per outlet. */
+    private function reportSos(User $u, array $f, bool $approved): array
+    {
+        $rows = $this->visitBase($u, $f, $approved)->join('merchandising_records as m', 'm.visit_id', '=', 'v.id')
+            ->whereNotNull('m.our_facings')->whereNotNull('m.total_facings')
+            ->groupBy('l.id', 'l.name', 'c.name')->orderBy('l.name')
+            ->selectRaw('l.name as location, c.name as campaign, count(*) as records, sum(m.our_facings) as ours, sum(m.total_facings) as total')
+            ->get()->map(fn ($r) => [
+                'location' => $r->location, 'campaign' => $r->campaign, 'records' => (int) $r->records,
+                'our_facings' => (int) $r->ours, 'total_facings' => (int) $r->total, 'sos' => self::pct($r->ours, $r->total),
+            ])->all();
+        $ours = array_sum(array_column($rows, 'our_facings'));
+        $total = array_sum(array_column($rows, 'total_facings'));
+
+        return [[
+            $this->col('location', 'Outlet', 'text'), $this->col('campaign', 'Campaign', 'text'), $this->col('records', 'Records'),
+            $this->col('our_facings', 'Our facings'), $this->col('total_facings', 'All facings'), $this->col('sos', 'Share of shelf', 'percent'),
+        ], $rows, ['outlets' => count($rows), 'overall_sos' => self::pct($ours, $total)]];
+    }
+
     private function reportLocationPerformance(User $u, array $f, bool $approved): array
     {
         $vis = $this->visitBase($u, $f, $approved)->groupBy('l.id', 'l.name', 'l.town')
@@ -407,6 +501,22 @@ class ReportService
             }
             fclose($out);
         }, $name, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    }
+
+    /** The same CSV as csv(), as a string (for email attachments). */
+    public function csvString(array $report): string
+    {
+        $out = fopen('php://temp', 'w+');
+        fwrite($out, "\xEF\xBB\xBF");
+        fputcsv($out, array_column($report['columns'], 'label'));
+        foreach ($report['rows'] as $row) {
+            fputcsv($out, array_map(fn ($c) => self::safeCell($row[$c['key']] ?? ''), $report['columns']));
+        }
+        rewind($out);
+        $csv = stream_get_contents($out);
+        fclose($out);
+
+        return $csv;
     }
 
     public static function safeCell(mixed $v): string

@@ -262,7 +262,7 @@ class _QuestionField extends ConsumerWidget {
         return Row(children: [
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: enabled ? () => captureEvidence(context, ref, visit, questionId: q.id, liveOnly: form.requiresLiveCapture) : null,
+              onPressed: enabled ? () => captureEvidence(context, ref, visit, questionId: q.id) : null,
               icon: const Icon(Icons.photo_camera_outlined),
               label: Text(photoCount == 0 ? 'Take photo' : 'Add another'),
             ),

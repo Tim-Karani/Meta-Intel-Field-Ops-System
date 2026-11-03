@@ -87,8 +87,11 @@ class CampaignLinkController extends ApiController
 
     private function syncLocations(Request $request, Campaign $campaign): array
     {
+        if (!$request->has('ids') && !$request->has('locations')) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['ids' => ['Send the list of location ids (an empty list unlinks them all).']]);
+        }
         $request->validate([
-            'locations' => ['required_without:ids', 'array', 'max:5000'],
+            'locations' => ['array', 'max:5000'],
             'locations.*.id' => ['required_with:locations', 'uuid', 'distinct', new Accessible(Location::class)],
             'locations.*.visit_frequency' => ['nullable', Rule::in(['once', 'daily', 'weekly', 'biweekly', 'monthly'])],
             'ids' => ['array', 'max:5000'],

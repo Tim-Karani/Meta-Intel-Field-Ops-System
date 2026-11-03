@@ -1,12 +1,16 @@
 import { h } from '../core/dom.js';
 
 /* Declarative form builder with server-side error mapping.
-   fields: [{ name, label, type, required, options, help, full, placeholder, rows, min, max, step, maxlength, value, hidden }] */
+   fields: [{ name, label, type, required, options, help, full, placeholder, rows, min, max, step, maxlength, value, hidden, tab }]
+   Give fields a `tab` (a label) to split a long form into tabs; the tabs appear in the order they are first used. */
 
 export function buildForm(fields, values = {}) {
   const controls = new Map();
   const errorEls = new Map();
   const grid = h('div', { class: 'form-grid' });
+  const tabNames = [...new Set(fields.filter((f) => !f.hidden && f.tab).map((f) => f.tab))];
+  const tabOf = new Map();          // field name -> tab label
+  const panes = new Map(tabNames.map((t) => [t, h('div', { class: 'form-grid', role: 'tabpanel' })]));
 
   for (const f of fields) {
     if (f.hidden) continue;
@@ -21,8 +25,20 @@ export function buildForm(fields, values = {}) {
       ? h('div', { class: ['field', f.full && 'full'] }, h('label', { class: 'check', for: id }, control.el, f.label), f.help && h('div', { class: 'help' }, f.help), err)
       : h('div', { class: ['field', (f.full || f.type === 'textarea' || f.type === 'multiselect') && 'full'] },
         h('label', { for: id, class: f.type === 'multiselect' ? 'lbl' : null }, f.label, f.required && h('span', { class: 'req', 'aria-hidden': 'true' }, ' *')),
-        control.el, f.help && h('div', { class: 'help' }, f.help), err);
-    grid.append(wrap);
+        control.el, f.help && h('div', { class: 'help' }, f.help), f.after ? f.after({ set: (n, v) => set(n, v), read: () => read() }) : null, err);
+    if (tabNames.length > 1 && f.tab) { panes.get(f.tab).append(wrap); tabOf.set(f.name, f.tab); } else grid.append(wrap);
+  }
+
+  let root = grid;
+  let showTab = () => {};
+  if (tabNames.length > 1) {
+    const buttons = new Map(tabNames.map((t) => [t, h('button', { class: 'tab', type: 'button', role: 'tab', onclick: () => showTab(t) }, t)]));
+    showTab = (name) => {
+      buttons.forEach((b, t) => { b.classList.toggle('active', t === name); b.setAttribute('aria-selected', t === name ? 'true' : 'false'); });
+      panes.forEach((p, t) => { p.hidden = t !== name; });
+    };
+    root = h('div', { class: 'form-tabs' }, h('div', { class: 'tabs', role: 'tablist' }, ...buttons.values()), ...panes.values(), grid);
+    showTab(tabNames[0]);
   }
 
   const read = () => {
@@ -48,6 +64,7 @@ export function buildForm(fields, values = {}) {
       ctl?.setAttribute?.('aria-invalid', 'true'); ctl?.setAttribute?.('aria-describedby', el.id);
       first ??= ctl;
     }
+    if (first) { const owner = [...controls].find(([, c]) => c.control.el === first)?.[0]; if (owner && tabOf.has(owner)) showTab(tabOf.get(owner)); }
     first?.focus?.();
     return !!first;
   };
@@ -59,7 +76,7 @@ export function buildForm(fields, values = {}) {
   const setOptions = (name, options) => controls.get(name)?.control.setOptions?.(options);
   const el = (name) => controls.get(name)?.control.el;
 
-  return { el: grid, read, showErrors, clearErrors, set, setOptions, control: el };
+  return { el: root, read, showErrors, clearErrors, set, setOptions, control: el, showTab };
 }
 
 function makeControl(f, id, initial, errId) {

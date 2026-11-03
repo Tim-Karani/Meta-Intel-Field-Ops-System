@@ -157,6 +157,7 @@ Base URL `/api/v1`. All responses use the envelope `{ "success", "message", "dat
 | DELETE | `/routes/{id}` | `territories.manage` | RouteController@destroy |
 | GET | `/locations` | `locations.view` | LocationController@index |
 | GET | `/locations/{id}` | `locations.view` | LocationController@show |
+| POST | `/locations/import` | `locations.manage` | LocationController@import — bulk add up to 500 outlets (`rows[]`, optional `campaign_id`, `client_id`, `dry_run`); reuses existing outlets (same code, or name+town) |
 | POST | `/locations/field` | `locations.capture` | LocationController@storeInField — agent adds an outlet in the field (client UUIDs, idempotent) |
 | POST | `/locations/{id}/confirm-geo` | `locations.manage` | LocationController@confirmGeo — accept or correct a captured position |
 | POST | `/locations` | `locations.manage` | LocationController@store |
@@ -181,3 +182,97 @@ Base URL `/api/v1`. All responses use the envelope `{ "success", "message", "dat
 | PATCH | `/products/{id}` | `products.manage` | ProductController@update |
 | PUT | `/products/{id}` | `products.manage` | ProductController@update |
 | DELETE | `/products/{id}` | `products.manage` | ProductController@destroy |
+
+## Project templates, journey plans (v1.2)
+
+| Method | Path | Permission | Notes |
+|---|---|---|---|
+| GET | `/project-templates` | campaigns.view | the 5 built-in + custom templates (`settings` always complete) |
+| POST/PATCH/DELETE | `/project-templates[/{id}]` | campaigns.edit / archive | built-in ones are read-only (403); in-use templates cannot be deleted (409) |
+| POST/PATCH | `/campaigns` | campaigns.create/edit | accepts `template_id` and `settings` (copied from the template when `settings` is omitted) |
+| GET/POST | `/journey-plans` | assignments.create | one plan per agent per campaign (409 otherwise) |
+| GET | `/journey-plans/{id}` | assignments.create | includes `stops: [{location_id, weekdays[], activity_id, start_time}]` |
+| PUT | `/journey-plans/{id}/stops` | assignments.edit | replaces stops; creates the next 14 days of visits |
+| POST | `/journey-plans/{id}/generate` | assignments.edit | creates any missing visits now |
+| POST | `/journey-plans/{id}/status` | assignments.edit | `active` / `paused` / `ended` (cancels upcoming unstarted visits) |
+| GET | `/sync/bootstrap` | assignments.view | now also returns `campaigns` (with `settings`, `can_add_outlet`, `add_outlet_denial`) and `profile.employment_type` |
+| POST | `/visits/{id}/photos` | evidence.upload | requires `source=camera` for evidence (422 `camera_required`) |
+
+
+## v1.3 additions
+
+| Method & path | Permission | Notes |
+|---|---|---|
+| `GET /attendance/board?date=` | `attendance.view` (not agents/clients) | team attendance: people in scope, state, work start/end, worked minutes, and the day's outlet check-ins with distance, GPS outcome and `checkin_photo_id` / `checkout_photo_id` |
+| `POST /visits/{id}/photos` | `evidence.upload` | `kind` is now `evidence`, `signature`, `checkin` or `checkout`; everything except `signature` needs `source=camera` |
+| `POST /visits/{id}/check-in` | `visits.create` | new refusals: `outside_radius` (more than 200 m from a mapped outlet) and `fake_gps` (mock location), both 422 |
+| `POST /visits/{id}/submit` | `visits.submit` | 422 keys `checkin_photo`, `checkout_photo` when the project requires them |
+| `POST /visits/{id}/merchandising` | `visits.edit` | optional `our_facings`, `total_facings` (share of shelf) |
+| `GET /reports/checkin`, `GET /reports/sos` | `reports.view` | new report types |
+| `GET /report-schedules/options`, `GET/POST /report-schedules`, `PATCH/DELETE /report-schedules/{id}`, `POST /report-schedules/{id}/send`, `GET /report-schedules/{id}/runs` | `reports.schedule` | scheduled reports; non-admins manage only their own |
+| `GET /lookups/team_leaders` | staff | Team Leader picker |
+| `POST/PATCH /users` | `users.create/edit` | role `team_leader`; `team_leader_id` on agents |
+
+
+## v1.4 additions
+| Method | Path | Permission | Notes |
+|---|---|---|---|
+| GET | `/executive/summary` | `reports.view` | `month=YYYY-MM`, `client_id`, `campaign_id`, `period=week|month`, `channel`, `msl_only` |
+| GET | `/agents/live` | `agents.track` | `search`, `seen_after`, `status`, `team_leader_id` |
+| GET | `/agents/{id}/overview` | `agents.track` | `date` (default today): profile, device, distance, outlet timeline, score |
+| GET | `/agents/scores` | `agents.track` | `date_from`, `date_to` |
+| POST | `/agent/ping` | `attendance.create` | latitude, longitude, accuracy_m, battery_pct, device_model, os_version, app_version |
+| GET | `/jp-requests` | `journey.request` or `journey.review` | `status` |
+| POST | `/jp-requests` | `journey.request` | journey_plan_id, type add/remove/move, location_id, weekday, to_weekday, reason, latitude, longitude, photo, client_uuid |
+| POST | `/jp-requests/{id}/approve` / `reject` | `journey.review` | reject needs `note`; cannot decide your own |
+| GET | `/jp-requests/{id}/proof` | same as list | the photo |
+| GET/POST | `/payroll-runs` | `payroll.view` / `payroll.manage` | name, period_start, period_end |
+| GET | `/payroll-runs/{id}` , `/export` | `payroll.view` | lines; CSV |
+| POST | `/payroll-runs/{id}/recalculate` , `approve` , `paid` | `payroll.manage` | draft -> approved -> paid |
+| PATCH | `/payroll-runs/{id}/lines/{line}` | `payroll.manage` | adjustment, adjustment_note (draft only) |
+
+## v1.5 additions
+| Method | Path | Permission | Notes |
+|---|---|---|---|
+| GET | `/auth/me` | any | now includes `features: { sales: bool }` (true when a project the user can see records sales) |
+| GET | `/stock?campaign_id=` | `stock.view` | rows per agent and product: issued, sold, returned, balance. `agent_id` optional |
+| GET | `/stock/movements?campaign_id=` | `stock.view` | hand-over log (latest 200) |
+| POST | `/stock` | `stock.manage` | campaign_id, agent_id, product_id, kind `issue`/`return`/`adjust`, quantity, note (required for `adjust`). 422 `sales_not_enabled` if the project does not sell |
+| POST | `/visits/{id}/submit` | `visits.submit` | response `data.status` is `approved` and `data.auto_approved` true when nothing needed review; otherwise `submitted` with `data.review_reason` (`new_outlet`, `gps_warning`, `review_all`) |
+| POST | `/visits/{id}/check-in` | `visits.edit` | 422 `outlet_not_mapped` when the project is `capture_geo: office_only` and the outlet has no position |
+| POST | `/visits/{id}/sales` | `visits.edit` | 422 `sales_not_enabled` when the project's Sales task is off |
+
+Project settings gained `review` (`exceptions` | `all`) and `capture_geo` (`office_only` | `first_visit`); `tasks.sales` now defaults to off.
+
+## v1.6 additions
+
+| Method & path | Purpose |
+|---|---|
+| `GET/POST /channels`, `GET/PATCH/DELETE /channels/{id}` | Chains / trade groups. Delete is refused (`409 channel_in_use`) while outlets belong to it. |
+| `GET /locations?channel_id=` | Outlets of one chain. Locations also accept `channel_id`, `region`, `locality`, `distributor`. |
+| `POST /locations/import` | Rows may carry `channel`, `channel_group`, `region`, `locality`, `distributor`. |
+| `GET /product-categories` | Returns `parent_id` / `parent`; `parent_id` on write makes a sub-category (one level). |
+| `GET /reports/{type}` | New types: `osa_by_channel`, `osa_by_category`, `osa_by_outlet`, `osa_by_product`, `sos_by_channel`, `sos_by_category`, `sos_by_outlet`, `sos_by_product`, `outlets_not_visited`. New filters: `channel_id`, `category_id`, `brand_id`, `product_id`. |
+| `GET /lookups/{channels,categories,brands}` | Picker lists. |
+
+
+## v1.7 additions (outlets)
+All use existing permissions: `locations.view` to read, `locations.manage` to change.
+
+| Method & path | Purpose |
+|---|---|
+| `GET/POST/PATCH/DELETE /outlet-types` | Outlet types. Slug is generated and fixed. Delete blocked while outlets use it (`outlet_type_in_use`). |
+| `GET/POST/PATCH/DELETE /outlet-subtypes` | Sub-types, each under one type (`outlet_type_id` filter). |
+| `GET/POST/PATCH/DELETE /outlet-statuses` | Statuses (`tone`, `counts_as_active`, `is_default`). One default, which must count as active (409 `default_must_be_active`, `default_required`). |
+| `GET/POST/PATCH/DELETE /distributors` | Distributors with `outlets_count`. |
+| `GET/POST/PATCH/DELETE /geo-areas` | Places. `level` country, region, locality, area; parent must be one level up (`level`, `parent_id` filters). Delete blocked (`geo_has_children`, `geo_in_use`). |
+| `POST /locations/batch` | `{ids (<=500), changes}`; changes limited to channel_id, type, outlet_subtype_id, outlet_status_id, distributor_id, geo_area_id, territory_id, setting. |
+| `GET /locations/summary?group_by=channel\|type\|status\|region\|distributor` | Counts per group: total, mapped, needs_review, active. |
+| `POST /locations/import` | Now accepts country, region, locality, area, subtype, distributor, status, phone, email, shop_no, market_name, setting. |
+
+## v1.8 additions
+- `users` / `PATCH /users/{id}`: `can_add_outlets` (agent switch).
+- `GET /journey-plans/owners`: other agents covering the given outlets. Journey plan stops carry `days` detail; list returns `outlets_count`.
+- Project settings: `targets` (osa, sos, visits_per_outlet, coverage); `outlet_adders` and review "all" removed.
+- Reports `run` response: `targets`, `osa_gap`.
+- Assignments outside campaign dates return 422.

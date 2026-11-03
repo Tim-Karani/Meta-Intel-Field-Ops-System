@@ -137,6 +137,7 @@ class SyncService {
     try {
       if (manual) await _repo.clearBackoff();
       await _session.refreshIfNeeded();
+      await _session.refreshProfile();      // picks up permission changes made by an administrator
       final pushedAll = await _push();
       if (pushedAll) {
         await _pull(full: fullDownload);
@@ -293,6 +294,7 @@ class SyncService {
           'client_uuid': photo['id'],
           'question_id': photo['question_id'],
           'kind': photo['kind'],
+          'source': photo['kind'] == 'signature' ? 'drawn' : 'camera',
           'captured_at': photo['captured_at'],
           'latitude': photo['latitude'],
           'longitude': photo['longitude'],

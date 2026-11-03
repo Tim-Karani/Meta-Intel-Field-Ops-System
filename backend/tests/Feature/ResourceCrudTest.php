@@ -22,7 +22,7 @@ class ResourceCrudTest extends DatabaseTestCase
         $this->s->actingAs($this->s->ops);
 
         $client = $this->api('POST', 'clients', ['name' => 'Acme Foods', 'code' => 'ACME'])->assertCreated()->json('data');
-        $campaign = $this->api('POST', 'campaigns', ['client_id' => $client['id'], 'code' => 'ACME-1', 'name' => 'Launch', 'start_date' => '2026-11-01', 'end_date' => '2026-12-01', 'status' => 'active'])
+        $campaign = $this->api('POST', 'campaigns', ['client_id' => $client['id'], 'code' => 'ACME-1', 'name' => 'Launch', 'start_date' => now()->toDateString(), 'end_date' => now()->addMonth()->toDateString(), 'status' => 'active'])
             ->assertCreated()->json('data');
         $this->assertSame('draft', $campaign['status'], 'status cannot be set through create');
 
@@ -37,6 +37,9 @@ class ResourceCrudTest extends DatabaseTestCase
         $this->api('POST', 'assignments', [
             'campaign_id' => $campaign['id'], 'activity_id' => $activity['id'], 'agent_id' => $agent->id, 'location_id' => $location['id'], 'scheduled_date' => now()->addDay()->toDateString(),
         ])->assertCreated()->assertJsonPath('data.status', 'pending');
+        $this->api('POST', 'assignments', [
+            'campaign_id' => $campaign['id'], 'agent_id' => $agent->id, 'location_id' => $location['id'], 'scheduled_date' => now()->addMonths(3)->toDateString(),
+        ])->assertStatus(422)->assertJsonPath('code', 'outside_campaign_dates');   // outside the project dates
         $this->api('POST', "campaigns/{$campaign['id']}/transition", ['status' => 'active'])->assertOk();
     }
 

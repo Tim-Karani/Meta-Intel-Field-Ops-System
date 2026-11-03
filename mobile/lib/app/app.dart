@@ -38,6 +38,7 @@ class _FieldOpsAppState extends ConsumerState<FieldOpsApp> with WidgetsBindingOb
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      ref.read(sessionProvider).recheckExpiry();
       ref.read(syncServiceProvider).requestSync(delay: const Duration(seconds: 1));
     }
   }
@@ -52,7 +53,7 @@ class _FieldOpsAppState extends ConsumerState<FieldOpsApp> with WidgetsBindingOb
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'Field Operations',
+      title: 'MetaIntel',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
       routerConfig: _router,

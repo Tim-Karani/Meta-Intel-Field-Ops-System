@@ -109,7 +109,7 @@ export default async function render({ container }) {
     filters: [{ key: 'campaign_id', label: 'All campaigns', options: campaigns }, { key: 'status', label: 'All statuses', options: statuses }, { key: 'date_from', label: 'From date', type: 'date' }, { key: 'date_to', label: 'To date', type: 'date' }],
     columns: [
       { key: 'scheduled_date', label: 'Date', sort: 'scheduled_date', render: (r) => h('div', null, fmtDate(r.scheduled_date), r.start_time && h('div', { class: 'small muted' }, `${r.start_time.slice(0, 5)}${r.end_time ? `–${r.end_time.slice(0, 5)}` : ''}`)) },
-      { key: 'agent', label: 'Agent', render: (r) => r.agent?.name || '—' },
+      { key: 'agent', label: 'Agent', render: (r) => h('div', null, r.agent?.name || '—', r.source && r.source !== 'office' && h('div', { class: 'small muted' }, r.source === 'journey_plan' ? 'Journey plan' : 'Added in the field')) },
       { key: 'location', label: 'Location', render: (r) => h('div', null, r.location?.id ? h('a', { href: href(`/locations/${r.location.id}`) }, r.location.name) : '—', r.location?.town && h('div', { class: 'small muted' }, r.location.town)) },
       { key: 'campaign', label: 'Campaign', render: (r) => (r.campaign ? h('a', { href: href(`/campaigns/${r.campaign.id}`) }, r.campaign.name) : '—') },
       { key: 'activity', label: 'Activity', render: (r) => r.activity?.name || '—' },

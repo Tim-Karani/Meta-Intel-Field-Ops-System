@@ -80,7 +80,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     child: const Icon(Icons.place_outlined, color: Brand.ink),
                   ),
                   const SizedBox(width: 12),
-                  const Text('Field Operations', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
+                  Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('MetaIntel', style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w800)),
+                    Text('Field Operation System', style: TextStyle(color: Colors.white.withValues(alpha: .75), fontSize: 13)),
+                  ]),
                 ]),
                 const SizedBox(height: 28),
                 Container(

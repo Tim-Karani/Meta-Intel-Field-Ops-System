@@ -140,7 +140,8 @@ export function tabs(items, { initial, onChange } = {}) {
     onChange?.(key);
   };
   paint(); select(current);
-  return h('div', null, bar, panel);
+  const root = h('div', null, bar, panel); root.select = select; // lets a page jump to a tab
+  return root;
 }
 
 export function kv(pairs) {

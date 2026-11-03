@@ -5,6 +5,7 @@ namespace App\Domain\Locations;
 use App\Domain\Assignments\AssignmentService;
 use App\Domain\Audit\AuditService;
 use App\Domain\Notifications\NotificationService;
+use App\Domain\Projects\ProjectSettings;
 use App\Enums\AssignmentStatus;
 use App\Models\Assignment;
 use App\Models\Campaign;
@@ -50,8 +51,14 @@ class OutletService
                 throw new DomainRuleException('Outlets can only be added to planned or active campaigns.', 'campaign_not_open');
             }
             if (!DB::table('campaign_users')->where('campaign_id', $campaign->id)->where('user_id', $agent->getKey())->exists()
-                && !DB::table('assignments')->where('campaign_id', $campaign->id)->where('agent_id', $agent->getKey())->exists()) {
+                && !DB::table('assignments')->where('campaign_id', $campaign->id)->where('agent_id', $agent->getKey())->exists()
+                && !DB::table('journey_plans')->where('campaign_id', $campaign->id)->where('agent_id', $agent->getKey())->exists()) {
                 throw new DomainRuleException('You are not part of this campaign.', 'forbidden', 403);
+            }
+
+            // The project's own rule: who may add outlets (set from its template, tunable per project).
+            if ($denial = ProjectSettings::outletAddDenial($campaign, $agent)) {
+                throw new DomainRuleException($denial, 'outlet_adding_not_allowed', 403);
             }
 
             // Same outlet name + town already known to this campaign? Point the agent at it instead of duplicating.

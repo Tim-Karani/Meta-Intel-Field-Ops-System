@@ -1,4 +1,4 @@
-# Field Operations - mobile app (Flutter, Android first)
+# MetaIntel - mobile app (Flutter, Android first)
 
 Offline-first app for field agents. Everything the agent does is saved on the phone first and sent to the server
 later, so a dead zone never loses work.

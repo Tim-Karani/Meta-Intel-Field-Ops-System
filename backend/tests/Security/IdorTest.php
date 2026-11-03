@@ -23,7 +23,7 @@ class IdorTest extends DatabaseTestCase
         $this->s->actingAs($this->s->agent);
         $this->visitId = $this->api('POST', 'visits', ['assignment_id' => $this->s->assignmentA->id, 'client_uuid' => (string) Str::uuid()])->json('data.id');
         $this->api('POST', "visits/{$this->visitId}/check-in", Scenario::gps())->assertOk();
-        $this->photoId = $this->api('POST', "visits/{$this->visitId}/photos", ['file' => UploadedFile::fake()->image('p.jpg')])->assertCreated()->json('data.id');
+        $this->photoId = $this->api('POST', "visits/{$this->visitId}/photos", ['source' => 'camera', 'file' => UploadedFile::fake()->image('p.jpg')])->assertCreated()->json('data.id');
         $this->api('POST', 'issues', ['title' => 'Mine', 'visit_id' => $this->visitId])->assertCreated();
     }
 
@@ -37,7 +37,7 @@ class IdorTest extends DatabaseTestCase
         $this->api('POST', "visits/$v/submit")->assertNotFound();
         $this->api('GET', "visits/$v/sales")->assertNotFound();
         $this->api('POST', "visits/$v/sales", ['items' => [['product_id' => $this->s->productA->id, 'quantity' => 1]]])->assertNotFound();
-        $this->api('POST', "visits/$v/photos", ['file' => UploadedFile::fake()->image('x.jpg')])->assertNotFound();
+        $this->api('POST', "visits/$v/photos", ['source' => 'camera', 'file' => UploadedFile::fake()->image('x.jpg')])->assertNotFound();
         $this->assertCount(0, $this->api('GET', 'visits')->json('data'));
     }
 

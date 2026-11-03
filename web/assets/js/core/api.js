@@ -1,4 +1,5 @@
 import { session } from './auth.js';
+import { withFocus } from './scope.js';
 
 export class ApiError extends Error {
   constructor(message, { status = 0, code = null, errors = {}, requestId = null } = {}) {
@@ -70,7 +71,7 @@ async function toError(res, payload) {
 }
 
 export const api = {
-  get: (path, query, opts) => request('GET', path, { query, ...opts }),
+  get: (path, query, opts) => request('GET', path, { query: withFocus(path, query), ...opts }),
   post: (path, body, opts) => request('POST', path, { body: body ?? {}, ...opts }),
   put: (path, body, opts) => request('PUT', path, { body: body ?? {}, ...opts }),
   patch: (path, body, opts) => request('PATCH', path, { body: body ?? {}, ...opts }),

@@ -24,23 +24,22 @@ class GpsManipulationTest extends DatabaseTestCase
         return $this->api('POST', 'visits', ['assignment_id' => $this->s->assignmentA->id, 'client_uuid' => (string) Str::uuid()])->json('data.id');
     }
 
-    public function test_mock_location_alone_is_only_a_warning_but_with_other_signals_is_suspicious(): void
+    public function test_a_mock_location_is_blocked_recorded_and_reported_to_the_team(): void
     {
         $v = $this->newVisit();
-        $this->api('POST', "visits/$v/check-in", Scenario::gps(0, ['mock_flag' => true]))->assertOk()->assertJsonPath('data.gps_outcome', 'warning');
-        $this->assertDatabaseHas('visit_checkins', ['visit_id' => $v, 'mock_flag' => true]);
-
-        $other = \App\Models\Visit::query()->create([
-            'assignment_id' => $this->s->assignmentA->id, 'campaign_id' => $this->s->campaignA->id, 'agent_id' => $this->s->agent->id,
-            'location_id' => $this->s->locationA->id, 'status' => 'scheduled', 'visit_date' => now()->toDateString(),
-        ]);
-        $this->api('POST', "visits/{$other->id}/check-in", Scenario::gps(160, ['mock_flag' => true, 'device_id' => 'another-device']))->assertOk()->assertJsonPath('data.gps_outcome', 'suspicious');
+        $this->api('POST', "visits/$v/check-in", Scenario::gps(0, ['mock_flag' => true]))->assertStatus(422)->assertJsonPath('code', 'fake_gps');
+        $this->assertDatabaseMissing('visit_checkins', ['visit_id' => $v]);
+        $this->assertSame('scheduled', Visit::query()->find($v)->status->value);
+        $this->assertDatabaseHas('visit_events', ['visit_id' => $v, 'type' => 'fake_gps_blocked']);
+        $this->assertDatabaseHas('notifications', ['user_id' => $this->s->supervisor->id, 'type' => 'visit.fake_gps']);
+        // Once the spoofing is switched off the agent can check in.
+        $this->api('POST', "visits/$v/check-in", Scenario::gps(0))->assertOk();
     }
 
-    public function test_suspicious_checkins_notify_reviewers(): void
+    public function test_several_weak_signals_together_are_suspicious_and_notify_reviewers(): void
     {
         $v = $this->newVisit();
-        $this->api('POST', "visits/$v/check-in", Scenario::gps(250, ['mock_flag' => true, 'device_ts' => now()->subHours(2)->toIso8601String()]))->assertOk()->assertJsonPath('data.gps_outcome', 'suspicious');
+        $this->api('POST', "visits/$v/check-in", Scenario::gps(150, ['device_ts' => now()->subHours(2)->toIso8601String()]))->assertOk()->assertJsonPath('data.gps_outcome', 'suspicious');
         $this->assertDatabaseHas('notifications', ['user_id' => $this->s->supervisor->id, 'type' => 'visit.gps_suspicious']);
     }
 
@@ -53,15 +52,15 @@ class GpsManipulationTest extends DatabaseTestCase
         $this->assertContains('timestamp_skew_large', $codes, 'a client-supplied offline_replay flag must be ignored');
     }
 
-    public function test_coordinates_far_outside_the_geofence_are_rejected_and_never_stored_as_a_check_in(): void
+    public function test_more_than_200_m_from_the_outlet_is_refused_and_never_stored_as_a_check_in(): void
     {
         $v = $this->newVisit();
         foreach ([2000, 50000, 1_000_000] as $m) {
-            $this->api('POST', "visits/$v/check-in", Scenario::gps($m))->assertStatus(422)->assertJsonPath('code', 'gps_rejected');
+            $this->api('POST', "visits/$v/check-in", Scenario::gps($m))->assertStatus(422)->assertJsonPath('code', 'outside_radius');
         }
         $this->assertDatabaseMissing('visit_checkins', ['visit_id' => $v]);
         $this->assertSame('scheduled', Visit::query()->find($v)->status->value);
-        $this->assertSame(3, \App\Models\VisitEvent::query()->where('visit_id', $v)->where('type', 'checkin_rejected')->count());
+        $this->assertSame(3, \App\Models\VisitEvent::query()->where('visit_id', $v)->where('type', 'checkin_blocked_distance')->count());
     }
 
     public function test_impossible_values_are_validation_errors(): void

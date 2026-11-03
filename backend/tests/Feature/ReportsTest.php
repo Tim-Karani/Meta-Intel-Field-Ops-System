@@ -17,11 +17,11 @@ class ReportsTest extends DatabaseTestCase
         $this->s = Scenario::build();
     }
 
-    public function test_all_thirteen_report_types_run_for_an_administrator(): void
+    public function test_every_report_type_runs_for_an_administrator(): void
     {
         $this->s->actingAs($this->s->admin);
         $types = $this->api('GET', 'reports')->assertOk()->json('data');
-        $this->assertCount(13, $types);
+        $this->assertCount(count(ReportService::TYPES), $types);
         foreach ($types as $t) {
             $r = $this->api('GET', 'reports/'.$t['type'])->assertOk()->json('data');
             $this->assertArrayHasKey('columns', $r, $t['type']);

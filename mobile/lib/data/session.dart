@@ -28,6 +28,11 @@ class Session extends ChangeNotifier {
   /// True after the server answered 401: the saved work is safe, but syncing needs a fresh sign-in.
   bool get expired => _expired;
 
+  /// Permissions the server granted this account (refreshed at every sign-in and sync). The server is the real gate;
+  /// the app uses this only to hide or explain actions up front instead of letting the agent do work that will be refused.
+  Set<String> get permissions => (_user?['permissions'] is List) ? (_user!['permissions'] as List).map((e) => e.toString()).toSet() : <String>{};
+  bool can(String slug) => permissions.contains(slug);
+
   String get userName => _user?.str('name') ?? '';
   String get userId => _user?.str('id') ?? '';
 
@@ -48,6 +53,17 @@ class Session extends ChangeNotifier {
       _user = user;
       final exp = await _store.expiresAt;
       _expired = exp != null && exp.isBefore(DateTime.now());
+      notifyListeners();
+    }
+  }
+
+  /// Called when the app comes back to the foreground: if the saved sign-in has run out, ask for a new one now rather than
+  /// letting the agent work for hours and find out when a submit is refused.
+  Future<void> recheckExpiry() async {
+    if (!signedIn || _expired) return;
+    final exp = await _store.expiresAt;
+    if (exp != null && exp.isBefore(DateTime.now())) {
+      _expired = true;
       notifyListeners();
     }
   }

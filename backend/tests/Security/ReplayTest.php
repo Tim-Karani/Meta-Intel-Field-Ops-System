@@ -31,7 +31,7 @@ class ReplayTest extends DatabaseTestCase
             $v = $this->api('POST', 'visits', ['assignment_id' => $this->s->assignmentA->id, 'client_uuid' => $uuids[0]])->json('data.id');
             $round === 0 && $this->api('POST', "visits/$v/check-in", Scenario::gps())->assertOk();
             $this->api('POST', "visits/$v/sales", ['client_uuid' => $uuids[1], 'items' => [['product_id' => $this->s->productA->id, 'quantity' => 2]]])->assertSuccessful();
-            $this->api('POST', "visits/$v/photos", ['client_uuid' => $uuids[2], 'file' => UploadedFile::fake()->image('p.jpg')])->assertSuccessful();
+            $this->api('POST', "visits/$v/photos", ['source' => 'camera', 'client_uuid' => $uuids[2], 'file' => UploadedFile::fake()->image('p.jpg')])->assertSuccessful();
             $this->api('POST', 'issues', ['client_uuid' => $uuids[3], 'title' => 'Replayed', 'visit_id' => $v])->assertSuccessful();
             $this->api('POST', 'attendance/clock-in', ['client_uuid' => $uuids[4]])->assertSuccessful();
         }

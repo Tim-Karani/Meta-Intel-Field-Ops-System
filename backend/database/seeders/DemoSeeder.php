@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Domain\Assignments\AssignmentService;
 use App\Domain\Audit\AuditService;
+use App\Domain\Evidence\EvidenceStorage;
 use App\Domain\Forms\FormStructureService;
 use App\Domain\Visits\VisitDataService;
 use App\Domain\Visits\VisitService;
@@ -26,6 +27,7 @@ use App\Models\Team;
 use App\Models\Territory;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -58,8 +60,10 @@ class DemoSeeder extends Seeder
         // --- catalogue ---------------------------------------------------------------------------
         $cat = ProductCategory::query()->create(['name' => '[DEMO] Soft drinks']);
         $brand = Brand::query()->create(['client_id' => $kbl->id, 'name' => '[DEMO] Zuri Cola']);
-        $products = collect([['Zuri Cola 500ml', 'DEMO-ZC-500', 60], ['Zuri Cola 2L', 'DEMO-ZC-2000', 180], ['Zuri Orange 500ml', 'DEMO-ZO-500', 60], ['Zuri Water 1L', 'DEMO-ZW-1000', 50]])
-            ->map(fn ($p) => Product::query()->create(['client_id' => $kbl->id, 'brand_id' => $brand->id, 'category_id' => $cat->id, 'name' => '[DEMO] '.$p[0], 'sku' => $p[1], 'unit_price' => $p[2]]));
+        $waterBrand = Brand::query()->create(['client_id' => $kbl->id, 'name' => '[DEMO] Zuri Water']);
+        $waterCat = ProductCategory::query()->create(['name' => '[DEMO] Water']);
+        $products = collect([['Zuri Cola 500ml', 'DEMO-ZC-500', 60, true], ['Zuri Cola 2L', 'DEMO-ZC-2000', 180, false], ['Zuri Orange 500ml', 'DEMO-ZO-500', 60, false], ['Zuri Water 1L', 'DEMO-ZW-1000', 50, true]])
+            ->map(fn ($p) => Product::query()->create(['client_id' => $kbl->id, 'brand_id' => $p[1] === 'DEMO-ZW-1000' ? $waterBrand->id : $brand->id, 'category_id' => $p[1] === 'DEMO-ZW-1000' ? $waterCat->id : $cat->id, 'name' => '[DEMO] '.$p[0], 'sku' => $p[1], 'unit_price' => $p[2], 'is_msl' => $p[3], 'sos_target_pct' => 10]));
 
         // --- geography ---------------------------------------------------------------------------
         $terr = Territory::query()->create(['name' => '[DEMO] Nairobi Central', 'code' => 'DEMO-NBO-C', 'region' => 'Nairobi']);
@@ -68,8 +72,9 @@ class DemoSeeder extends Seeder
             ['Karen Shopping Centre', 'Karen', -1.3190, 36.7120], ['Eastleigh Wholesale', 'Eastleigh', -1.2750, 36.8480], ['Lang\'ata Tuskys', 'Lang\'ata', -1.3600, 36.7400],
             ['Parklands Chandarana', 'Parklands', -1.2630, 36.8180], ['South C Store', 'South C', -1.3180, 36.8300],
         ];
+        $chains = collect(['[DEMO] Chain A', '[DEMO] Chain B', '[DEMO] Independents'])->map(fn ($n, $i) => \App\Models\Channel::query()->create(['name' => $n, 'channel_group' => $i < 2 ? 'Modern trade' : 'Traditional trade']));
         $locations = collect($places)->map(fn ($p, $i) => Location::query()->create([
-            'client_id' => null, 'territory_id' => $terr->id, 'name' => "[DEMO] {$p[0]}", 'code' => 'DEMO-L'.($i + 1), 'type' => 'supermarket',
+            'channel_id' => $chains[$i % 3]->id, 'region' => 'Nairobi', 'client_id' => null, 'territory_id' => $terr->id, 'name' => "[DEMO] {$p[0]}", 'code' => 'DEMO-L'.($i + 1), 'type' => 'supermarket',
             'address' => $p[1].', Nairobi', 'county' => 'Nairobi', 'town' => $p[1], 'latitude' => $p[2], 'longitude' => $p[3], 'geofence_radius_m' => 100, 'created_by' => $admin->id,
         ]));
         $route = Route::query()->create(['territory_id' => $terr->id, 'name' => '[DEMO] Westlands loop', 'code' => 'DEMO-R1']);
@@ -94,6 +99,7 @@ class DemoSeeder extends Seeder
             'client_id' => $kbl->id, 'code' => 'DEMO-ZURI-Q4', 'name' => '[DEMO] Zuri Cola Q4 Merchandising', 'campaign_type' => 'merchandising',
             'description' => 'Demo campaign for local development.', 'budget' => 1500000, 'start_date' => now()->subDays(14)->toDateString(),
             'end_date' => now()->addDays(60)->toDateString(), 'status' => CampaignStatus::Draft, 'created_by' => $admin->id,
+            'settings' => \App\Domain\Projects\ProjectSettings::PRESETS['merchandising']['settings'],
         ]);
         $audit = Activity::query()->create(['campaign_id' => $campaign->id, 'form_id' => $form->id, 'name' => '[DEMO] Shelf audit', 'activity_type' => 'store_audit', 'target' => 200, 'status' => 'active', 'created_by' => $admin->id]);
         $campaign->locations()->sync($locations->mapWithKeys(fn ($l) => [$l->id => ['visit_frequency' => 'weekly']])->all());
@@ -104,7 +110,7 @@ class DemoSeeder extends Seeder
         CampaignKpi::query()->create(['campaign_id' => $campaign->id, 'name' => 'OSA rate', 'metric' => 'osa_rate', 'target' => 90, 'unit' => '%']);
         $campaign->update(['status' => CampaignStatus::Active]);
 
-        Campaign::query()->create(['client_id' => $dairy->id, 'code' => 'DEMO-SAV-LAUNCH', 'name' => '[DEMO] Savannah Yoghurt Launch', 'campaign_type' => 'sampling', 'status' => CampaignStatus::Planned, 'start_date' => now()->addDays(10)->toDateString(), 'created_by' => $admin->id]);
+        Campaign::query()->create(['client_id' => $dairy->id, 'code' => 'DEMO-SAV-LAUNCH', 'name' => '[DEMO] Savannah Yoghurt Launch', 'campaign_type' => 'sampling', 'settings' => \App\Domain\Projects\ProjectSettings::PRESETS['sales_rep']['settings'], 'status' => CampaignStatus::Planned, 'start_date' => now()->addDays(10)->toDateString(), 'created_by' => $admin->id]);
 
         // --- team --------------------------------------------------------------------------------
         $team = Team::query()->create(['name' => '[DEMO] Nairobi Team A', 'region' => 'Nairobi', 'supervisor_id' => $users['supervisor']->id]);
@@ -143,6 +149,7 @@ class DemoSeeder extends Seeder
         $data = app(VisitDataService::class);
         $visit = $visits->start($agent, $assignment, (string) Str::uuid(), $gps['device_id']);
         $visit = $visits->checkIn($visit, $agent, $gps);
+        $this->proof($visit, $agent, 'checkin');
 
         $q = $form->questions->keyBy('label');
         $visits->saveResponses($visit, [
@@ -155,8 +162,16 @@ class DemoSeeder extends Seeder
         if ($withSale) {
             $data->addSale($visit, ['payment_method' => 'mpesa', 'items' => [['product_id' => $products[0]->id, 'quantity' => 6], ['product_id' => $products[2]->id, 'quantity' => 4]]]);
         }
+        $data->addMerchandising($visit, ['posm_present' => true, 'our_facings' => 14, 'total_facings' => 60]);
         $visit = $visits->checkOut($visit, $agent, $gps);
+        $this->proof($visit, $agent, 'checkout');
         $visits->submit($visit, $agent);
+    }
+
+    /** A stand-in check-in / check-out photo so the demo visits can be submitted under the proof-photo rule. */
+    private function proof(\App\Models\Visit $visit, User $agent, string $kind): void
+    {
+        app(EvidenceStorage::class)->storePhoto(UploadedFile::fake()->image($kind.'.jpg', 640, 480), $visit, $agent, ['kind' => $kind, 'source' => 'camera']);
     }
 
     /** @return array<string,mixed> */
@@ -174,13 +189,21 @@ class DemoSeeder extends Seeder
             'ops' => $make('ops', 'Operations Manager', 'demo.ops@example.com', RoleEnum::OperationsManager),
             'campaign_manager' => $make('cm', 'Campaign Manager', 'demo.campaign@example.com', RoleEnum::CampaignManager),
             'supervisor' => $make('sup', 'Supervisor', 'demo.supervisor@example.com', RoleEnum::Supervisor),
+            'team_leader' => $make('tl1', 'Team Leader Nairobi', 'demo.teamleader@example.com', RoleEnum::TeamLeader),
+            'team_leader_2' => $make('tl2', 'Team Leader Mombasa', 'demo.teamleader2@example.com', RoleEnum::TeamLeader),
             'analyst' => $make('an', 'Analyst', 'demo.analyst@example.com', RoleEnum::Analyst),
+            'executive' => $make('ex', 'Executive', 'demo.executive@example.com', RoleEnum::Executive),
+            'hr' => $make('hr', 'HR Payroll', 'demo.hr@example.com', RoleEnum::Hr),
             'client' => $make('cl', 'Client User', 'demo.client@example.com', RoleEnum::ClientUser),
         ];
-        $out['agents'] = collect([['Amina Wanjiru', 'merchandiser'], ['Brian Otieno', 'brand_ambassador'], ['Cynthia Mutua', 'promoter'], ['David Kiprop', 'merchandiser']])
+        // Supervisor > Team Leaders (one per region) > Agents
+        foreach ([['team_leader', 'Nairobi', 'DEMO-TL1'], ['team_leader_2', 'Mombasa', 'DEMO-TL2']] as [$key, $region, $code]) {
+            AgentProfile::query()->create(['user_id' => $out[$key]->id, 'agent_type' => 'team_leader', 'employment_type' => 'permanent', 'agent_code' => $code, 'pay_type' => 'daily', 'pay_rate' => 2500, 'supervisor_id' => $out['supervisor']->id, 'region' => $region]);
+        }
+        $out['agents'] = collect([['Amina Wanjiru', 'merchandiser', 'permanent'], ['Brian Otieno', 'brand_ambassador', 'reliever'], ['Cynthia Mutua', 'promoter', 'reliever'], ['David Kiprop', 'merchandiser', 'permanent']])
             ->map(function ($a, $i) use ($make, $out) {
                 $u = $make('ag'.$i, $a[0], 'demo.agent'.($i + 1).'@example.com', RoleEnum::FieldAgent);
-                AgentProfile::query()->create(['user_id' => $u->id, 'agent_type' => $a[1], 'agent_code' => 'DEMO-A'.($i + 1), 'supervisor_id' => $out['supervisor']->id, 'region' => 'Nairobi']);
+                AgentProfile::query()->create(['user_id' => $u->id, 'agent_type' => $a[1], 'employment_type' => $a[2], 'agent_code' => 'DEMO-A'.($i + 1), 'pay_type' => $i === 1 ? 'hourly' : 'daily', 'pay_rate' => $i === 1 ? 350 : 2000, 'supervisor_id' => $out['supervisor']->id, 'team_leader_id' => $out[$i < 2 ? 'team_leader' : 'team_leader_2']->id, 'region' => $i < 2 ? 'Nairobi' : 'Mombasa']);
 
                 return $u;
             })->all();

@@ -1,3 +1,4 @@
+import { hasFeature, scopeType } from '../core/auth.js';
 import { h } from '../core/dom.js';
 import { api } from '../core/api.js';
 import { fmtMoney, fmtPercent, titleCase } from '../core/format.js';
@@ -15,7 +16,7 @@ export default async function render({ container }) {
   const date = (key, label) => { const el = h('input', { class: 'input', type: 'date', 'aria-label': label, title: label, value: filters[key], onchange: () => { if (el.value) { filters[key] = el.value; paint(); } } }); return h('div', { class: 'field' }, el); };
   container.append(pageHead({ title: 'Analytics', subtitle: 'Trends and rankings computed from approved and submitted field data.' }),
     h('div', { class: 'card', style: { marginBottom: '16px' } }, h('div', { class: 'toolbar' }, date('date_from', 'From date'), date('date_to', 'To date'),
-      selectControl({ label: 'Campaign', options: campaigns, blank: 'All campaigns', onChange: (v) => { v ? filters.campaign_id = v : delete filters.campaign_id; paint(); } }))), grid);
+      !['all', 'campaigns', 'team'].includes(scopeType()) && selectControl({ label: 'Campaign', options: campaigns, blank: 'All campaigns', onChange: (v) => { v ? filters.campaign_id = v : delete filters.campaign_id; paint(); } }))), grid);
 
   const report = (type, extra = {}) => () => api.get(`reports/${type}`, { ...filters, ...extra }).then((r) => r.data);
   const panel = (title, loader, render, cls = '') => { const body = h('div'); asyncView(body, loader, (rep) => (rep.rows?.length ? render(rep) : empty('No data for this period', 'Try a wider date range.'))); return h('section', { class: ['card', cls] }, h('div', { class: 'card-head' }, h('h3', null, title)), h('div', { class: 'card-body' }, body)); };
@@ -24,7 +25,7 @@ export default async function render({ container }) {
   function paint() {
     grid.replaceChildren(
       panel('Visits per day', report('visit_completion'), (rep) => lineChart({ labels: rep.rows.map((r) => r.date.slice(5)), series: [{ name: 'All visits', values: rep.rows.map((r) => r.total) }, { name: 'Approved', values: rep.rows.map((r) => r.approved) }] })),
-      h('div', { class: 'grid cols-2' },
+      hasFeature('sales') && h('div', { class: 'grid cols-2' },
         panel('Sales value by campaign', report('sales', { group_by: 'campaign' }), (rep) => hBars({ items: top(rep.rows, 'value').map((r) => ({ label: r.dimension, value: r.value })), format: fmtMoney })),
         panel('Sales value by territory', report('sales', { group_by: 'territory' }), (rep) => hBars({ items: top(rep.rows, 'value').map((r) => ({ label: r.dimension, value: r.value })), format: fmtMoney }))),
       h('div', { class: 'grid cols-2' },

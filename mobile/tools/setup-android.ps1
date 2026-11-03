@@ -47,6 +47,11 @@ if ($xml -notmatch 'usesCleartextTraffic') {
   $xml = $xml -replace '<application', '<application android:usesCleartextTraffic="true"'
   Write-Host '  added: usesCleartextTraffic (development only - remove for production)'
 }
+# The name under the app icon on the phone.
+if ($xml -notmatch 'android:label="MetaIntel"') {
+  $xml = $xml -replace 'android:label="[^"]*"', 'android:label="MetaIntel"'
+  Write-Host '  set the app name to MetaIntel'
+}
 Set-Content -Path $manifest -Value $xml -Encoding UTF8
 
 # Gradle: the plugins (geolocator, secure storage) need minSdk 23+.

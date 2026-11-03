@@ -25,6 +25,10 @@ class AssignmentService
             if (!DB::table('campaign_locations')->where('campaign_id', $campaign->id)->where('location_id', $data['location_id'])->exists()) {
                 throw new DomainRuleException('The location is not linked to this campaign.', 'location_not_in_campaign');
             }
+            $day = \Illuminate\Support\Carbon::parse($data['scheduled_date'])->startOfDay();
+            if (($campaign->start_date && $day->lt($campaign->start_date->copy()->startOfDay())) || ($campaign->end_date && $day->gt($campaign->end_date->copy()->startOfDay()))) {
+                throw new DomainRuleException('That date is outside the project dates ('.($campaign->start_date?->toFormattedDateString() ?? 'no start').' to '.($campaign->end_date?->toFormattedDateString() ?? 'no end').'). Change the project dates first, or pick a date inside them.', 'outside_campaign_dates');
+            }
             $activity = null;
             if (!empty($data['activity_id'])) {
                 $activity = Activity::query()->findOrFail($data['activity_id']);
@@ -88,10 +92,38 @@ class AssignmentService
             'campaign_id' => $campaign->id, 'activity_id' => $activity?->id, 'agent_id' => $agent->getKey(), 'location_id' => $data['location_id'],
             'supervisor_id' => DB::table('agent_profiles')->where('user_id', $agent->getKey())->value('supervisor_id'), 'form_id' => $formId,
             'scheduled_date' => $data['scheduled_date'], 'status' => AssignmentStatus::Accepted, 'accepted_at' => now(), 'created_by' => $agent->getKey(),
-            'instructions' => 'Added in the field by the agent.',
+            'instructions' => 'Added in the field by the agent.', 'source' => 'field',
         ], fn ($v) => $v !== null))->save();
 
         return $assignment;
+    }
+
+    /**
+     * One visit generated from a fixed journey plan. Quiet (the agent gets one summary notification per generation, not one per
+     * visit), already accepted (a fixed plan needs no acceptance) and idempotent: (stop, date) is unique.
+     *
+     * @return Assignment|null null when that stop already has a visit on that date
+     */
+    public function createFromJourneyPlan(\App\Models\JourneyPlanStop $stop, \App\Models\JourneyPlan $plan, string $date): ?Assignment
+    {
+        if (Assignment::query()->where('journey_plan_stop_id', $stop->id)->whereDate('scheduled_date', $date)->exists()) {
+            return null;
+        }
+        $formId = DB::table('activities')->where('id', $stop->activity_id)->value('form_id')
+            ?? DB::table('campaign_forms')->join('forms', 'forms.id', '=', 'campaign_forms.form_id')
+                ->where('campaign_forms.campaign_id', $plan->campaign_id)->where('forms.status', 'published')
+                ->orderByDesc('forms.version')->value('forms.id');
+
+        $a = new Assignment();
+        $a->forceFill([
+            'campaign_id' => $plan->campaign_id, 'activity_id' => $stop->activity_id, 'agent_id' => $plan->agent_id, 'location_id' => $stop->location_id,
+            'supervisor_id' => DB::table('agent_profiles')->where('user_id', $plan->agent_id)->value('supervisor_id'), 'form_id' => $formId,
+            'scheduled_date' => $date, 'start_time' => $stop->start_time, 'status' => AssignmentStatus::Accepted, 'accepted_at' => now(),
+            'created_by' => $plan->created_by, 'source' => 'journey_plan', 'journey_plan_stop_id' => $stop->id,
+            'instructions' => 'From your fixed journey plan.',
+        ])->save();
+
+        return $a;
     }
 
     public function transition(Assignment $assignment, AssignmentStatus $to, User $actor, ?string $reason = null): Assignment

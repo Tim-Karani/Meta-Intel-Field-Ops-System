@@ -27,7 +27,7 @@ export function secureImage(photo, { alt = 'Evidence photo', cls = '' } = {}) {
 export function photoGrid(photos, { onChange } = {}) {
   if (!photos.length) return empty('No photos', 'Evidence appears here once agents upload it.');
   return h('div', { class: 'photo-grid' }, photos.map((p) => h('button', { type: 'button', class: 'photo-tile', 'aria-label': `Open ${p.kind || 'photo'}`, onclick: () => openPhoto(p, onChange) },
-    secureImage(p), h('span', { class: 'tile-badge' }, badge(p.review_status)))));
+    secureImage(p), ['checkin', 'checkout'].includes(p.kind) && h('span', { class: 'tile-kind' }, p.kind === 'checkin' ? 'Check-in' : 'Check-out'), h('span', { class: 'tile-badge' }, badge(p.review_status)))));
 }
 
 export function openPhoto(p, onChange) {
@@ -50,7 +50,7 @@ export function openPhoto(p, onChange) {
     }
     try { await api.post(`photos/${p.id}/review`, { status, note }); toast(status === 'accepted' ? 'Photo accepted.' : 'Photo rejected.'); m.close(); onChange?.(); } catch (e) { toastError(e); }
   };
-  const m = openModal({ title: p.kind === 'signature' ? 'Signature' : 'Evidence photo', body, size: 'lg',
+  const m = openModal({ title: { signature: 'Signature', checkin: 'Check-in photo', checkout: 'Check-out photo' }[p.kind] || 'Evidence photo', body, size: 'lg',
     footer: (close) => [h('button', { class: 'btn', type: 'button', onclick: () => close() }, 'Close'),
       canReview && p.review_status !== 'rejected' && h('button', { class: 'btn danger', type: 'button', onclick: review('rejected') }, 'Reject'),
       canReview && p.review_status !== 'accepted' && h('button', { class: 'btn primary', type: 'button', onclick: review('accepted') }, 'Accept')] });

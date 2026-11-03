@@ -1,7 +1,7 @@
 import { h } from '../core/dom.js';
 import { icon } from '../core/icons.js';
 import { api } from '../core/api.js';
-import { session } from '../core/auth.js';
+import { session, hasFeature } from '../core/auth.js';
 import { fmtDate, fmtMoney, fmtNumber, fmtPercent, titleCase } from '../core/format.js';
 import { asyncView, badge, card, kv, pageHead, stat, empty, actionButton, toastError } from '../ui/feedback.js';
 import { dataTable, simpleTable } from '../ui/table.js';
@@ -10,7 +10,9 @@ import { photoGrid } from '../ui/gallery.js';
 import { href, navigate } from '../core/router.js';
 import { selectControl } from '../ui/form.js';
 
-const PORTAL_REPORTS = [['campaign_performance', 'Campaign performance'], ['sales', 'Sales'], ['osa', 'On-shelf availability'], ['merchandising', 'Merchandising'], ['location_performance', 'Location performance'], ['visit_completion', 'Visit completion'], ['activity_performance', 'Activity performance']];
+const ALL_PORTAL_REPORTS = [['campaign_performance', 'Campaign performance'], ['sales', 'Sales'], ['osa', 'On-shelf availability'], ['merchandising', 'Merchandising'], ['location_performance', 'Location performance'], ['visit_completion', 'Visit completion'], ['activity_performance', 'Activity performance']];
+
+const PORTAL_REPORTS = () => ALL_PORTAL_REPORTS.filter(([t]) => t !== 'sales' || hasFeature('sales'));
 
 export default async function render(ctx) {
   const { container, route, params } = ctx;
@@ -31,11 +33,11 @@ function home(container) {
     const trend = (summary.visit_trend || []);
     return h('div', { class: 'stack' },
       h('div', { class: 'grid cols-4' },
-        stat({ label: 'Active campaigns', value: fmtNumber(c.active_campaigns), icon: 'flag' }), stat({ label: 'Sales (30 days)', value: fmtMoney(c.sales_value_30d), icon: 'dollar' }),
+        stat({ label: 'Active campaigns', value: fmtNumber(c.active_campaigns), icon: 'flag' }), hasFeature('sales') ? stat({ label: 'Sales (30 days)', value: fmtMoney(c.sales_value_30d), icon: 'dollar' }) : stat({ label: 'Visits (30 days)', value: fmtNumber(c.visits_30d ?? c.visits_today), icon: 'pin' }),
         stat({ label: 'OSA (30 days)', value: c.osa_availability_30d == null ? 'No data' : fmtPercent(c.osa_availability_30d), icon: 'box' }), stat({ label: 'Approved visits today', value: fmtNumber(c.visits_today), icon: 'checkCircle' })),
       h('div', { class: 'grid split' },
         card('Approved visits · last 14 days', trend.some((t) => t.completed) ? lineChart({ labels: trend.map((t) => t.date.slice(5)), series: [{ name: 'Approved visits', values: trend.map((t) => t.completed) }] }) : empty('No approved visits yet')),
-        card('Reports', h('div', { class: 'stack sm' }, PORTAL_REPORTS.map(([t, l]) => h('a', { class: 'btn', href: href(`/portal/reports/${t}`), style: { justifyContent: 'flex-start' } }, icon('bars', { size: 16 }), l))))),
+        card('Reports', h('div', { class: 'stack sm' }, PORTAL_REPORTS().map(([t, l]) => h('a', { class: 'btn', href: href(`/portal/reports/${t}`), style: { justifyContent: 'flex-start' } }, icon('bars', { size: 16 }), l))))),
       card('Campaigns', simpleTable([
         { label: 'Campaign', render: (r) => h('div', null, h('strong', null, r.name), h('div', { class: 'small muted mono' }, r.code)) }, { label: 'Type', render: (r) => (r.campaign_type ? titleCase(r.campaign_type) : '—') },
         { label: 'Dates', render: (r) => `${fmtDate(r.start_date)} → ${fmtDate(r.end_date)}` }, { label: 'Approved visits', align: 'right', render: (r) => fmtNumber(r.approved_visits) }, { label: 'Status', render: (r) => badge(r.status) }], campaigns, { emptyText: 'No campaigns are available yet.' }), { flush: true }),
@@ -66,7 +68,7 @@ async function reportPage(container, type, query) {
   const campaigns = (await api.get('portal/campaigns').catch(() => ({ data: [] }))).data.map((c) => ({ value: c.id, label: c.name }));
   const result = h('div');
   const date = (key, label) => { const el = h('input', { class: 'input', type: 'date', 'aria-label': label, title: label, value: filters[key] || '', onchange: () => { el.value ? filters[key] = el.value : delete filters[key]; run(); } }); return h('div', { class: 'field' }, el); };
-  const label = PORTAL_REPORTS.find(([t]) => t === type)?.[1] || titleCase(type);
+  const label = ALL_PORTAL_REPORTS.find(([t]) => t === type)?.[1] || titleCase(type);
   container.append(pageHead({ title: label, subtitle: 'Approved visits only.', actions: [h('a', { class: 'btn', href: href('/portal') }, 'Back to results'), actionButton('Export CSV', async () => { try { await api.download(`portal/reports/${type}/export`, filters, `${type}.csv`); } catch (e) { toastError(e); } }, { iconName: 'download' })] }),
     h('div', { class: 'card', style: { marginBottom: '16px' } }, h('div', { class: 'toolbar' }, date('date_from', 'From date'), date('date_to', 'To date'), selectControl({ label: 'Campaign', options: campaigns, blank: 'All campaigns', value: filters.campaign_id || '', onChange: (v) => { v ? filters.campaign_id = v : delete filters.campaign_id; run(); } }))), result);
   const fmt = { int: (v) => fmtNumber(v), decimal: (v) => fmtNumber(v, 2), money: fmtMoney, percent: (v) => fmtPercent(v), date: fmtDate, status: (v) => badge(v), text: (v) => v };

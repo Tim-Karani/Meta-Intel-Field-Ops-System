@@ -11,7 +11,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ReportController extends ApiController
 {
-    public const FILTERS = ['client_id', 'campaign_id', 'activity_id', 'team_id', 'supervisor_id', 'agent_id', 'territory_id', 'route_id', 'location_id'];
+    public const FILTERS = ['client_id', 'campaign_id', 'activity_id', 'team_id', 'supervisor_id', 'agent_id', 'territory_id', 'route_id', 'location_id', 'channel_id', 'category_id', 'brand_id', 'product_id'];
 
     public function __construct(private ReportService $reports) {}
 

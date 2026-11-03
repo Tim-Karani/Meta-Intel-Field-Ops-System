@@ -12,5 +12,11 @@ class ProductCategory extends Model
 
     protected $fillable = [
         'name',
+        'parent_id',
     ];
+
+    public function parent(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
 }

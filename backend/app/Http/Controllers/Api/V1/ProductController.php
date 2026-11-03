@@ -29,6 +29,9 @@ class ProductController extends ResourceController
             'sku' => ['nullable', 'string', 'max:60', Rule::unique('products', 'sku')->ignore($model?->getKey())],
             'unit_price' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
             'status' => ['in:active,inactive'],
+            'sos_target_pct' => ['nullable', 'numeric', 'between:0,100'],
+            'pack_size' => ['nullable', 'string', 'max:60'],
+            'units_per_case' => ['nullable', 'integer', 'between:1,100000'],
         ];
     }
 

@@ -91,6 +91,7 @@ class VisitDataService
             'posm_present' => $data['posm_present'] ?? null, 'posm_type' => $data['posm_type'] ?? null, 'shelf_position' => $data['shelf_position'] ?? null,
             'planogram_compliant' => $data['planogram_compliant'] ?? null, 'price_compliant' => $data['price_compliant'] ?? null,
             'competitor_present' => $data['competitor_present'] ?? null, 'competitor_notes' => $data['competitor_notes'] ?? null,
+            'our_facings' => $data['our_facings'] ?? null, 'total_facings' => $data['total_facings'] ?? null,
             'captured_at' => $data['captured_at'] ?? now(), 'notes' => $data['notes'] ?? null,
         ]);
     }

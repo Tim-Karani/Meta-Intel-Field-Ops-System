@@ -11,6 +11,8 @@
 | `QUEUE_CONNECTION=database`, `CACHE_STORE=database` | shared by all containers |
 | `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` | first administrator; forced to change password in production |
 | `SANCTUM_TOKEN_TTL_MINUTES` | token lifetime (default 1440) |
+| `MAIL_MAILER`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_ENCRYPTION`, `MAIL_FROM_ADDRESS` | **needed for scheduled reports and password resets.** The default `MAIL_MAILER=log` only writes emails to the log. Use `smtp` with your provider (for Gmail: host `smtp.gmail.com`, port `587`, `tls`, an *app password*). After changing `.env` run `docker compose restart app queue scheduler`. |
+| `CHECKIN_MAX_DISTANCE_M` | farthest an agent may be from a mapped outlet and still check in (default `200`) |
 | `EVIDENCE_PATH` | private evidence directory (default `storage/app/private/evidence`); mount as a volume and back it up with the database |
 
 ## First deploy

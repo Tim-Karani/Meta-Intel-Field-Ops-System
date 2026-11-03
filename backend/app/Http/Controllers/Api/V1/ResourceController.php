@@ -91,6 +91,12 @@ abstract class ResourceController extends ApiController
             }
         }
 
+        if (($focus = \App\Domain\Access\ProjectFocus::campaignIds($request->query())) && \Illuminate\Support\Facades\Schema::hasColumn($model->getTable(), 'campaign_id')) {
+            $query->whereIn($model->qualifyColumn('campaign_id'), $focus);
+        } elseif ($focus) {
+            \App\Domain\Access\ProjectFocus::restrict($query, $model->getTable(), $request->query());
+        }
+
         $sort = is_string($request->query('sort')) ? $request->query('sort') : $this->defaultSort;
         $dir = str_starts_with($sort, '-') ? 'desc' : 'asc';
         $col = ltrim($sort, '-');

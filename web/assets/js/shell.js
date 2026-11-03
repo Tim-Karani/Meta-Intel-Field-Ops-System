@@ -1,15 +1,16 @@
 import { h, clear, debounce } from './core/dom.js';
 import { icon } from './core/icons.js';
-import { session, canAny, can, roleName, scopeType } from './core/auth.js';
+import { session, canAny, can, roleName, scopeType, hasFeature } from './core/auth.js';
 import { api } from './core/api.js';
 import { initials } from './core/format.js';
 import { NAV } from './nav.js';
 import { href, navigate } from './core/router.js';
 import { toast } from './ui/feedback.js';
+import { scopeBar } from './ui/scope-bar.js';
 
 /* Authenticated application frame: sidebar, top bar, breadcrumbs, notifications bell, global search. */
 export function createShell({ onLogout }) {
-  const appName = window.APP_CONFIG?.appName || 'Field Operations';
+  const appName = window.APP_CONFIG?.appName || 'MetaIntel';
   const user = session.user;
   const nav = h('nav', { class: 'nav', 'aria-label': 'Main' });
   const crumbs = h('div', { class: 'crumbs' });
@@ -18,13 +19,15 @@ export function createShell({ onLogout }) {
   const shell = h('div', { class: 'shell' });
   let reviewBadge = null;
 
-  const visible = NAV.map((g) => ({ ...g, items: g.items.filter((i) => canAny(i.perm) && !(i.hideFor === 'client' && scopeType() === 'client')) })).filter((g) => g.items.length);
+  const visible = NAV.map((g) => ({ ...g, items: g.items.filter((i) => canAny(i.perm) && !(i.hideFor === 'client' && scopeType() === 'client') && (!i.feature || hasFeature(i.feature))) })).filter((g) => g.items.length);
   const links = new Map();
+  const alias = new Map(); // child page route -> the menu item that groups it
   for (const g of visible) {
     nav.append(h('div', { class: 'nav-group' }, g.group && h('h4', null, g.group), g.items.map((i) => {
       const a = h('a', { href: href(i.route), onclick: () => shell.classList.remove('nav-open') }, icon(i.icon), h('span', null, i.label));
       if (i.badge === 'review') { reviewBadge = h('span', { class: 'badge-count hidden' }, '0'); a.append(reviewBadge); }
       links.set(i.route, a);
+      (i.also || []).forEach((r) => alias.set(r, i.route));
       return a;
     })));
   }
@@ -43,16 +46,17 @@ export function createShell({ onLogout }) {
   document.addEventListener('click', () => toggle(false));
 
   const search = globalSearch();
+  const focusBar = scopeBar();
 
   shell.append(
     h('aside', { class: 'sidebar' },
-      h('div', { class: 'brand' }, h('span', { class: 'brand-mark' }, icon('pin', { size: 18 })), h('span', null, appName, h('small', null, 'Field operations'))),
+      h('div', { class: 'brand' }, h('span', { class: 'brand-mark' }, icon('pin', { size: 18 })), h('span', null, appName, h('small', null, 'Field Operation System'))),
       nav),
     h('div', { class: 'scrim', onclick: () => shell.classList.remove('nav-open') }),
     h('div', { class: 'main-col' },
       h('header', { class: 'topbar' },
         h('button', { class: 'icon-btn menu-btn', type: 'button', 'aria-label': 'Open menu', onclick: () => shell.classList.add('nav-open') }, icon('menu')),
-        crumbs, h('span', { class: 'spacer' }), search, bell,
+        crumbs, h('span', { class: 'spacer' }), focusBar.el, search, bell,
         h('div', { style: { position: 'relative' } }, chip, userMenu)),
       main));
 
@@ -79,8 +83,11 @@ export function createShell({ onLogout }) {
   return {
     el: shell, main,
     setActive(path) {
+      focusBar.update(path);
       let best = null;
-      links.forEach((a, route) => { if (path === route || path.startsWith(`${route}/`)) { if (!best || route.length > best[0].length) best = [route, a]; } });
+      const hit = (route) => path === route || path.startsWith(`${route}/`);
+      links.forEach((a, route) => { if (hit(route) && (!best || route.length > best[0].length)) best = [route, a]; });
+      alias.forEach((menuRoute, child) => { if (hit(child) && links.has(menuRoute) && (!best || child.length > best[0].length)) best = [child, links.get(menuRoute)]; });
       links.forEach((a) => a.removeAttribute('aria-current'));
       best?.[1].setAttribute('aria-current', 'page');
     },

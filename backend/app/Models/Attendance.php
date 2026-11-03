@@ -24,6 +24,10 @@ class Attendance extends Model
         'clock_out_at',
         'clock_out_lat',
         'clock_out_lng',
+        'work_started_at',
+        'work_ended_at',
+        'worked_minutes',
+        'outlets_visited',
         'status',
         'notes',
     ];
@@ -34,6 +38,8 @@ class Attendance extends Model
             'attendance_date' => 'date:Y-m-d',
             'clock_in_at' => 'datetime',
             'clock_out_at' => 'datetime',
+            'work_started_at' => 'datetime',
+            'work_ended_at' => 'datetime',
         ];
     }
 

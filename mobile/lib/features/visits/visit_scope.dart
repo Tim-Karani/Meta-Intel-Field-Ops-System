@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/local_visit.dart';
+import '../common/refused_banner.dart';
 import '../../state/providers.dart';
 
 typedef VisitBuilder = Widget Function(BuildContext context, WidgetRef ref, LocalVisit visit, bool editable);
@@ -21,12 +22,15 @@ class VisitScope extends ConsumerWidget {
     if (v == null) {
       return Scaffold(appBar: AppBar(title: Text(title)), body: const Center(child: CircularProgressIndicator()));
     }
-    final editable = v.status == 'started' || v.status == 'completed';
+    final stuck = ref.watch(stuckOpsProvider(visitId)).valueOrNull ?? const [];
+    final locked = stuck.any((o) => foundationOps.contains(o.type));
+    final editable = (v.status == 'started' || v.status == 'completed') && !locked;
     return Scaffold(
       appBar: AppBar(title: Text(title)),
       floatingActionButton: editable && fab != null ? fab!(context, ref, v, editable) : null,
       body: Column(children: [
-        if (!editable)
+        if (stuck.isNotEmpty) RefusedBanner(visitId: v.localId, ops: stuck),
+        if (!editable && !locked)
           Container(
             width: double.infinity,
             color: const Color(0xFFFFF3E0),

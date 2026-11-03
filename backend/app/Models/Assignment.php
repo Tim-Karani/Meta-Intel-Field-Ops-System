@@ -30,6 +30,8 @@ class Assignment extends Model
         'accepted_at',
         'completed_at',
         'created_by',
+        'source',
+        'journey_plan_stop_id',
     ];
 
     protected function casts(): array

@@ -58,6 +58,28 @@ class OutboxOp {
     );
   }
 
+  /// Plain-language reason for a failure, and what to do about it. The raw server text is kept in [error].
+  String get explanation {
+    final what = label.toLowerCase();
+    switch (httpStatus) {
+      case 403:
+        if (type == 'outlet_create') {
+          return 'The server refused to add this outlet because your account is not allowed to add outlets (or you are not part of that campaign). '
+              'Nothing you entered for it can be sent until this is fixed. Ask your supervisor to give your account the "Add outlets in the field" permission, then tap Retry - or discard this outlet.';
+        }
+        return 'The server refused "$what": your account does not have permission for this action. Ask your supervisor or administrator. The data is safe on this phone.';
+      case 404:
+        return 'The server no longer has the record this "$what" belongs to (it may have been removed or reassigned). Ask your supervisor.';
+      case 409:
+        return 'The server already has a different result for this "$what". Your supervisor needs to look at it.';
+      case 422:
+      case 400:
+        return 'The server did not accept this "$what": ${error ?? 'invalid data'}. Fix the data if you can, or ask your supervisor.';
+      default:
+        return error ?? 'This step could not be sent.';
+    }
+  }
+
   bool get needsAttention => status == OpStatus.failed || status == OpStatus.conflict;
 
   /// Human label for the Sync Center.

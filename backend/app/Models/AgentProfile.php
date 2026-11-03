@@ -19,15 +19,24 @@ class AgentProfile extends Model
     protected $fillable = [
         'user_id',
         'agent_type',
+        'employment_type',
+        'can_add_outlets',
         'agent_code',
         'supervisor_id',
+        'team_leader_id',
         'region',
+        'pay_type',
+        'pay_rate',
     ];
 
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+    public function teamLeader(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'team_leader_id');
     }
     public function supervisor(): BelongsTo
     {

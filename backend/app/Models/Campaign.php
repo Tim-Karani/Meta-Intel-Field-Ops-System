@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Concerns\Auditable;
 use App\Enums\CampaignStatus;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use App\Domain\Projects\ProjectSettings;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -28,7 +30,18 @@ class Campaign extends Model
         'status',
         'status_reason',
         'created_by',
+        'template_id',
+        'settings',
     ];
+
+    /** Always stored complete and validated (unknown keys dropped, gaps filled), whatever the caller sent. */
+    protected function settings(): Attribute
+    {
+        return Attribute::make(
+            get: fn ($v) => $v === null ? null : (is_array($v) ? $v : json_decode($v, true)),
+            set: fn ($v) => $v === null ? null : json_encode(ProjectSettings::normalize(is_array($v) ? $v : json_decode((string) $v, true))),
+        );
+    }
 
     protected function casts(): array
     {
@@ -40,6 +53,10 @@ class Campaign extends Model
         ];
     }
 
+    public function template(): BelongsTo
+    {
+        return $this->belongsTo(ProjectTemplate::class, 'template_id');
+    }
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);

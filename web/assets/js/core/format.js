@@ -41,3 +41,18 @@ const TONES = {
   archived: 'plain', inactive: 'plain', low: 'plain',
 };
 export const toneFor = (status) => TONES[String(status).toLowerCase()] || '';
+
+/** How a project's dates stand today: { text, tone } or null when it has no dates. */
+export function daysLeft(c) {
+  if (!c || (!c.start_date && !c.end_date)) return null;
+  const day = (v) => { const d = parse(v); return d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null; };
+  const t = day(new Date()); const s = day(c.start_date); const e = day(c.end_date);
+  const n = (a, b) => Math.round((a - b) / 86400000);
+  const plural = (x) => `${x} day${x === 1 ? '' : 's'}`;
+  if (s && t < s) return { text: `Starts in ${plural(n(s, t))}`, tone: 'muted' };
+  if (!e) return { text: 'No end date set', tone: 'muted' };
+  const left = n(e, t);
+  if (left < 0) return { text: `Ended ${plural(-left)} ago`, tone: 'bad-text' };
+  if (left === 0) return { text: 'Ends today', tone: 'warn-text' };
+  return { text: `${plural(left)} left`, tone: left <= 7 ? 'warn-text' : 'ok-text' };
+}

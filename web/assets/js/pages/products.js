@@ -5,10 +5,11 @@ import { lookup } from '../core/lookups.js';
 import { api } from '../core/api.js';
 import { fmtMoney } from '../core/format.js';
 
+const topOpts = async () => (await api.get('product-categories', { per_page: 100 })).data.filter((r) => !r.parent_id).map((r) => ({ value: r.id, label: r.name }));
 const opts = async (path) => (await api.get(path, { per_page: 100 })).data.map((r) => ({ value: r.id, label: r.name }));
 
 export default async function render({ container }) {
-  const [clients, brands, categories] = await Promise.all([lookup('clients').catch(() => []), opts('brands').catch(() => []), opts('product-categories').catch(() => [])]);
+  const [clients, brands, categories, topCategories] = await Promise.all([lookup('clients').catch(() => []), opts('brands').catch(() => []), opts('product-categories').catch(() => []), topOpts().catch(() => [])]);
 
   const products = () => crudPage({
     embedded: true,
@@ -17,7 +18,9 @@ export default async function render({ container }) {
     fields: () => [
       { name: 'name', label: 'Product name', required: true }, { name: 'sku', label: 'SKU', maxlength: 60 },
       { name: 'client_id', label: 'Client', type: 'select', options: clients }, { name: 'brand_id', label: 'Brand', type: 'select', options: brands },
-      { name: 'category_id', label: 'Category', type: 'select', options: categories }, { name: 'unit_price', label: 'Unit price (KES)', type: 'decimal', min: 0 },
+      { name: 'category_id', label: 'Category / sub-category', type: 'select', options: categories },
+      { name: 'pack_size', label: 'Pack size', maxlength: 60, help: 'e.g. 500 ml, 400 g.' }, { name: 'units_per_case', label: 'Units per case', type: 'number', min: 1 }, { name: 'unit_price', label: 'Unit price (KES)', type: 'decimal', min: 0 },
+      { name: 'sos_target_pct', label: 'Expected share of shelf (%)', type: 'decimal', min: 0, max: 100, help: 'Optional. Compared with the real share of shelf on the Executive summary.' },
       { name: 'status', label: 'Status', type: 'select', options: ['active', 'inactive'], blank: false, value: 'active' },
     ],
     filters: [{ key: 'client_id', label: 'All clients', options: clients }, { key: 'brand_id', label: 'All brands', options: brands }, { key: 'category_id', label: 'All categories', options: categories }, { key: 'status', label: 'All statuses', options: ['active', 'inactive'] }],
@@ -40,8 +43,8 @@ export default async function render({ container }) {
   const catTab = () => crudPage({
     embedded: true,
     title: 'Categories', noun: 'category', endpoint: 'product-categories', perms: { create: 'products.manage', edit: 'products.manage', delete: 'products.manage' }, defaultSort: 'name',
-    fields: () => [{ name: 'name', label: 'Category name', required: true }],
-    columns: [{ key: 'name', label: 'Category', sort: 'name', render: (r) => h('strong', null, r.name) }],
+    fields: () => [{ name: 'name', label: 'Category name', required: true }, { name: 'parent_id', label: 'Sub-category of', type: 'select', options: topCategories, help: 'Leave empty for a main category. Reports roll sub-categories up into their main category.' }],
+    columns: [{ key: 'name', label: 'Category', sort: 'name', render: (r) => h('strong', null, r.name) }, { key: 'parent', label: 'Sub-category of', render: (r) => r.parent?.name || '—' }],
   });
   container.append(pageHead({ title: 'Products', subtitle: 'Catalogue used by sales, OSA and merchandising capture.' }),
     tabs([{ key: 'products', label: 'Products', render: products }, { key: 'brands', label: 'Brands', render: brandTab }, { key: 'categories', label: 'Categories', render: catTab }]));

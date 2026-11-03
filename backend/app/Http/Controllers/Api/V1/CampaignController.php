@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Assignments\CampaignService;
+use App\Domain\Projects\ProjectSettings;
+use App\Models\ProjectTemplate;
 use App\Enums\CampaignStatus;
 use App\Models\Campaign;
 use App\Models\Client;
@@ -17,7 +19,7 @@ use Illuminate\Validation\Rule;
 class CampaignController extends ResourceController
 {
     protected string $model = Campaign::class;
-    protected array $with = ['client:id,name'];
+    protected array $with = ['client:id,name', 'template:id,slug,name'];
     protected array $withCount = ['activities', 'locations', 'teams', 'users'];
     protected array $search = ['name', 'code', 'campaign_type'];
     protected array $filters = ['status' => 'status', 'client_id' => 'client_id', 'campaign_type' => 'campaign_type'];
@@ -36,13 +38,19 @@ class CampaignController extends ResourceController
             'budget' => ['nullable', 'numeric', 'min:0', 'max:9999999999'],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
-        ];
+            'template_id' => ['nullable', 'uuid', Rule::exists('project_templates', 'id')],
+        ] + ProjectTemplateController::settingsRules();
     }
 
     protected function creating(array $data, Request $request): array
     {
         $data = parent::creating($data, $request);
         $data['status'] = CampaignStatus::Draft->value;   // status only changes through the transition endpoint
+        // The chosen template supplies the project setup unless the form sent its own (tuned) copy.
+        if (empty($data['settings']) && !empty($data['template_id'])) {
+            $data['settings'] = ProjectTemplate::query()->find($data['template_id'])?->settings;
+        }
+        $data['settings'] = $data['settings'] ?? ProjectSettings::DEFAULTS;
 
         return $data;
     }
@@ -64,6 +72,7 @@ class CampaignController extends ResourceController
     {
         $out = $model->toArray();
         $out['status'] = $model->status->value;
+        $out['settings'] = ProjectSettings::for($model);
         $out['allowed_transitions'] = array_map(fn ($s) => $s->value, $model->status->next());
 
         return $out;

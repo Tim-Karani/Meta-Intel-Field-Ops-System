@@ -48,7 +48,7 @@ class InjectionAndHeadersTest extends DatabaseTestCase
             $res->assertHeader('X-Content-Type-Options', 'nosniff');
             $res->assertHeader('X-Frame-Options', 'DENY');
             $res->assertHeader('Referrer-Policy', 'no-referrer');
-            $res->assertHeader('Cache-Control', 'no-store');
+            $this->assertStringContainsString('no-store', (string) $res->headers->get('Cache-Control'));
             $this->assertNotEmpty($res->headers->get('X-Request-Id'));
             $this->assertStringContainsString("default-src 'none'", $res->headers->get('Content-Security-Policy'));
         }

@@ -1,18 +1,18 @@
 import { h } from '../core/dom.js';
 import { icon } from '../core/icons.js';
 import { api } from '../core/api.js';
-import { can, session, isClientUser } from '../core/auth.js';
-import { fmtMoney, fmtNumber, fmtPercent, fmtDate, relTime, titleCase, today } from '../core/format.js';
+import { can, session, isClientUser, hasFeature } from '../core/auth.js';
+import { fmtMoney, fmtNumber, fmtPercent, fmtDate, titleCase, today } from '../core/format.js';
 import { asyncView, card, pageHead, stat, empty, badge } from '../ui/feedback.js';
 import { lineChart, donutChart, hBars } from '../ui/charts.js';
 import { mapView } from '../ui/map.js';
 import { simpleTable } from '../ui/table.js';
-import { secureImage } from '../ui/gallery.js';
 import { href, navigate } from '../core/router.js';
 import { lookup } from '../core/lookups.js';
 
 /* Command Center: one client / campaign / period at a time, so different clients' work is never mixed. */
 
+const todayIso = () => today();
 const FOCUS_KEY = 'dashboard.focus.v2';
 const PRESETS = [{ value: '7', label: 'Last 7 days' }, { value: '14', label: 'Last 14 days' }, { value: '30', label: 'Last 30 days' }, { value: '90', label: 'Last 90 days' }, { value: 'month', label: 'This month' }, { value: 'custom', label: 'Custom range' }];
 const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -112,71 +112,63 @@ function operations(d, bar, label) {
   const trend = d.visit_trend || [];
   const points = (d.map_points || []).filter((x) => x.lat != null).map((x) => ({ lat: Number(x.lat), lng: Number(x.lng), label: `${x.location} · ${x.agent}`, tone: TONE[x.outcome] || 'info' }));
   const cov = d.coverage;
+  const sales = hasFeature('sales');
 
-  const pulse = p && card(`Today's pulse · ${fmtDate(today())}`, h('div', { class: 'pulse' },
+  // ---- the five things that matter, first
+  const today = p && card(`Today · ${fmtDate(todayIso())}`, h('div', { class: 'stack-sm' },
     h('div', null, h('div', { class: 'pulse-top' }, h('strong', null, `${fmtNumber(p.completed)} of ${fmtNumber(p.assignments_total)}`), h('span', { class: 'muted small' }, ' assignments completed')),
       h('div', { class: 'progress tall' }, h('span', { style: { width: `${p.assignments_total ? Math.round(p.completed / p.assignments_total * 100) : 0}%` } }))),
-    h('div', { class: 'pulse-grid' },
-      [['In progress', p.in_progress], ['Still to do', p.to_do], ['Agents clocked in', p.agents_clocked_in], ['Late arrivals', p.late_arrivals], ['Visits submitted', p.visits_submitted], ['Issues opened', p.issues_opened]]
+    h('div', { class: 'pulse-grid three' },
+      [['Agents clocked in', p.agents_clocked_in], ['Still to do', p.to_do], ['Late arrivals', p.late_arrivals]]
         .map(([l, v]) => h('div', { class: 'pulse-cell' }, h('div', { class: 'num' }, fmtNumber(v)), h('div', { class: 'small muted' }, l))))));
 
   const rows = [
-    ['Visits waiting for review', att.pending_reviews, can('visits.review') && '/visits', 'clipboard'],
-    ['Suspicious GPS check-ins', att.gps_flags, can('visits.view') && '/visits', 'shield'],
+    ['Visits to review', att.pending_reviews, can('visits.review') && '/visits', 'clipboard'],
     ['Overdue assignments', att.overdue_assignments, can('assignments.view') && '/assignments', 'clock'],
-    ['Critical or high issues open', att.urgent_issues, can('issues.view') && '/issues', 'alert'],
+    ['Urgent issues', att.urgent_issues, can('issues.view') && '/issues', 'alert'],
   ].filter(([, n]) => n > 0);
   const attention = card('Needs attention', rows.length
-    ? h('ul', { class: 'attention' }, rows.map(([text, n, to, ic]) => h('li', null, h('a', { href: to ? href(to) : null }, h('span', { class: 'att-ic' }, icon(ic, { size: 16 })), h('span', { class: 'att-text' }, text), h('strong', { class: 'att-n' }, fmtNumber(n)), icon('chevronRight', { size: 14 })))))
-    : h('p', { class: 'muted' }, 'All clear. Nothing is waiting on you in this focus.'));
+    ? h('div', null, h('ul', { class: 'attention' }, rows.map(([text, n, to, ic]) => h('li', null, h('a', { href: to ? href(to) : null }, h('span', { class: 'att-ic' }, icon(ic, { size: 16 })), h('span', { class: 'att-text' }, text), h('strong', { class: 'att-n' }, fmtNumber(n)), icon('chevronRight', { size: 14 }))))),
+      h('p', { class: 'small muted' }, 'Visits at known outlets with clean GPS are approved automatically. Only the rest need you.'))
+    : h('p', { class: 'muted' }, 'All clear. Nothing is waiting on you.'),
+  );
 
-  const health = card('Campaign execution health', simpleTable([
-    { label: 'Campaign', render: (r) => h('div', null, h('a', { href: can('campaigns.view') ? href(`/campaigns/${r.id}`) : null }, r.name), h('div', { class: 'small muted' }, r.client || '')) },
-    { label: 'Status', render: (r) => badge(r.status) },
-    { label: 'Planned', align: 'right', render: (r) => fmtNumber(r.planned) },
+  const progress = card('Project progress', simpleTable([
+    { label: 'Project', render: (r) => h('div', null, h('a', { href: can('campaigns.view') ? href(`/campaigns/${r.id}`) : null }, r.name), h('div', { class: 'small muted' }, r.client || '')) },
     { label: 'Completion', render: (r) => progressCell(r.completion_rate) },
     { label: 'Visits', align: 'right', render: (r) => fmtNumber(r.visits) },
-    { label: 'Approval', render: (r) => progressCell(r.approval_rate, { goodAt: 85 }) },
-    { label: 'OSA', render: (r) => progressCell(r.osa, { goodAt: 85 }) },
-    { label: 'Target progress', render: (r) => (r.target ? h('div', null, progressCell(r.target_progress, { goodAt: 70 }), h('div', { class: 'small muted' }, `${fmtNumber(r.lifetime_visits)} of ${fmtNumber(r.target)} visits`)) : h('span', { class: 'muted small' }, 'No target set')) },
-    { label: 'Sales', align: 'right', render: (r) => fmtMoney(r.sales) },
-  ], d.campaign_health || [], { emptyText: 'No live campaigns in this focus.' }), { flush: true });
+    ...(sales ? [{ label: 'Sales', align: 'right', render: (r) => fmtMoney(r.sales) }] : []),
+  ], d.campaign_health || [], { emptyText: 'No live projects in this focus.' }), { flush: true });
 
-  const coverage = card('Store coverage', cov && cov.total_stores ? h('div', null,
-    h('div', { class: 'cov-head' }, h('div', { class: 'big-number' }, fmtPercent(cov.rate, 0)), h('div', { class: 'muted small' }, `${fmtNumber(cov.visited)} of ${fmtNumber(cov.total_stores)} stores visited in this period`)),
+  // ---- everything else, one click away
+  const coverage = cov && cov.total_stores ? h('div', null,
+    h('div', { class: 'cov-head' }, h('div', { class: 'big-number' }, fmtPercent(cov.rate, 0)), h('div', { class: 'muted small' }, `${fmtNumber(cov.visited)} of ${fmtNumber(cov.total_stores)} stores visited`)),
     h('div', { class: 'progress tall' }, h('span', { style: { width: `${cov.rate || 0}%` } })),
-    cov.missed.length ? h('div', null, h('h4', { class: 'cov-sub' }, `Not visited (${fmtNumber(cov.not_visited)})`),
-      h('ul', { class: 'activity-list' }, cov.missed.map((m) => h('li', null, h('div', null, h('a', { href: can('locations.view') ? href(`/locations/${m.id}`) : null }, m.name), m.town ? ` · ${m.town}` : ''),
-        h('div', { class: 'small muted' }, m.last_visit ? `Last visited ${fmtDate(m.last_visit)}` : 'Never visited'))))) : h('p', { class: 'muted small', style: { marginTop: '10px' } }, 'Every store in the network was visited.'))
-    : empty('No store network yet', 'Link locations to a campaign to track coverage.'));
+    cov.missed.length ? h('ul', { class: 'activity-list' }, cov.missed.slice(0, 6).map((m) => h('li', null, h('a', { href: can('locations.view') ? href(`/locations/${m.id}`) : null }, m.name), h('div', { class: 'small muted' }, m.last_visit ? `Last visited ${fmtDate(m.last_visit)}` : 'Never visited')))) : null)
+    : empty('No store network yet', 'Link outlets to a project to track coverage.');
 
-  const photos = card('Latest photo proof', (d.photos || []).length ? h('div', { class: 'photo-strip' }, d.photos.map((x) => h('a', { class: 'photo-chip', href: href(`/visits/${x.visit_id}`), 'aria-label': `Open visit at ${x.location}` },
-    secureImage(x, { alt: `Photo at ${x.location}` }), h('span', { class: 'cap' }, x.location)))) : h('p', { class: 'muted' }, 'No photos in this period.'));
+  const more = h('details', { class: 'more' }, h('summary', null, icon('chevronRight', { size: 14 }), 'More detail'),
+    h('div', { class: 'more-body' },
+      h('div', { class: 'grid cols-2' }, card('Store coverage', coverage),
+        card('Top agents', simpleTable([{ label: 'Agent', key: 'agent' }, { label: 'Visits', align: 'right', render: (r) => fmtNumber(r.visits) }, { label: 'Rejected', align: 'right', render: (r) => fmtNumber(r.rejected) }], (d.top_agents || []).slice(0, 5), { emptyText: 'No agent activity.' }), { flush: true })),
+      h('div', { class: 'grid cols-2' },
+        card('Open issues', issues.length ? hBars({ items: issues }) : h('p', { class: 'muted' }, 'No open issues.')),
+        card('Projects by status', status.length ? donutChart({ items: status, centerLabel: 'projects' }) : empty('No projects yet'))),
+      card('Where agents checked in', points.length ? mapView({ markers: points, height: 340 }) : empty('No check-ins yet', 'Check-in locations for the selected period appear here.'))));
 
-  return h('div', { class: 'stack' },
-    pageHead({ title: 'Command Center', subtitle: `${fmtDate(d.period?.from)} to ${fmtDate(d.period?.to)} · Showing ${label}.` }),
+  return h('div', { class: 'dash' },
+    pageHead({ title: 'Dashboard', subtitle: `${fmtDate(d.period?.from)} to ${fmtDate(d.period?.to)} · ${label}` }),
     bar,
-    h('div', { class: 'grid split' }, pulse || h('div'), attention),
-    h('div', { class: 'grid cols-3' },
-      kpi('Visits executed', fmtNumber(k.visits_executed?.value), 'pin', k.visits_executed, days),
-      kpi('Assignment completion', k.completion_rate?.value == null ? 'No data' : fmtPercent(k.completion_rate.value), 'clipboard', k.completion_rate, days),
-      kpi('Approval rate', k.approval_rate?.value == null ? 'No data' : fmtPercent(k.approval_rate.value), 'checkCircle', k.approval_rate, days),
+    h('div', { class: 'grid cols-4' },
+      kpi('Visits done', fmtNumber(k.visits_executed?.value), 'pin', k.visits_executed, days),
+      kpi('Completion', k.completion_rate?.value == null ? 'No data' : fmtPercent(k.completion_rate.value), 'clipboard', k.completion_rate, days),
       kpi('Active agents', fmtNumber(k.active_agents?.value), 'users', k.active_agents, days),
-      kpi('Sales value', fmtMoney(k.sales_value?.value), 'dollar', k.sales_value, days),
-      kpi('On-shelf availability', k.osa_availability?.value == null ? 'No data' : fmtPercent(k.osa_availability.value), 'box', k.osa_availability, days)),
-    h('div', { class: 'grid split' },
-      card(`Planned vs completed visits · ${days} days`, trend.some((t) => t.planned || t.completed)
-        ? lineChart({ labels: trend.map((t) => t.date.slice(5)), series: [{ name: 'Planned', values: trend.map((t) => t.planned) }, { name: 'Completed', values: trend.map((t) => t.completed) }] })
-        : empty('No visits in this period', 'Charts fill in as assignments are created and visits submitted.')),
-      coverage),
-    health,
-    h('div', { class: 'grid cols-3' },
-      card('Top agents', simpleTable([{ label: 'Agent', key: 'agent' }, { label: 'Visits', align: 'right', render: (r) => fmtNumber(r.visits) }, { label: 'Approved', align: 'right', render: (r) => fmtNumber(r.approved) }, { label: 'Rejected', align: 'right', render: (r) => fmtNumber(r.rejected) }], d.top_agents || [], { emptyText: 'No agent activity.' }), { flush: true }),
-      card('Open issues by priority', issues.length ? hBars({ items: issues }) : h('p', { class: 'muted' }, 'No open issues.')),
-      card('Campaigns by status', status.length ? donutChart({ items: status, centerLabel: 'campaigns' }) : empty('No campaigns yet'))),
-    h('div', { class: 'grid split' }, photos,
-      card('Recent activity', (d.recent_activity || []).length ? h('ul', { class: 'activity-list' }, d.recent_activity.map((e) => h('li', null,
-        h('div', null, h('a', { href: can('visits.view') ? href(`/visits/${e.visit_id}`) : null }, titleCase(e.type)), ` · ${e.agent} at ${e.location}`),
-        h('div', { class: 'small muted' }, relTime(e.created_at), e.note ? ` — ${e.note}` : '')))) : h('p', { class: 'muted' }, 'No activity yet.'))),
-    card('Geographic activity · check-ins in this period', points.length ? mapView({ markers: points, height: 360 }) : empty('No check-ins yet', 'Check-in locations for the selected period appear here.')));
+      sales ? kpi('Sales', fmtMoney(k.sales_value?.value), 'dollar', k.sales_value, days)
+        : kpi('On-shelf availability', k.osa_availability?.value == null ? 'No data' : fmtPercent(k.osa_availability.value), 'box', k.osa_availability, days)),
+    h('div', { class: 'grid split' }, today || h('div'), attention),
+    card(`Visits per day · last ${days} days`, trend.some((t) => t.planned || t.completed)
+      ? lineChart({ labels: trend.map((t) => t.date.slice(5)), series: [{ name: 'Planned', values: trend.map((t) => t.planned) }, { name: 'Completed', values: trend.map((t) => t.completed) }] })
+      : empty('No visits in this period', 'The chart fills in as assignments are created and visits submitted.')),
+    progress,
+    more);
 }

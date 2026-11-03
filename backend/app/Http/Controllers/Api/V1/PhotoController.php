@@ -31,8 +31,8 @@ class PhotoController extends ApiController
                 $q->where("photos.$f", $v);
             }
         }
-        if (($c = $this->filterValue($request, 'campaign_id', true)) !== null) {
-            $q->whereIn('photos.visit_id', Visit::query()->where('campaign_id', $c)->select('id'));
+        if ($this->filterValue($request, 'campaign_id', true) !== null || $this->filterValue($request, 'client_id', true) !== null) {
+            $q->whereIn('photos.visit_id', Visit::query()->whereIn('campaign_id', \App\Domain\Access\ProjectFocus::campaignIds($request->query()))->select('id'));
         }
         $page = $q->orderByDesc('photos.created_at')->orderBy('photos.id')->paginate($this->perPage($request));
 
@@ -52,11 +52,17 @@ class PhotoController extends ApiController
             'file' => ['required', 'file', 'max:'.config('field.uploads.max_kb')],
             'client_uuid' => ['nullable', 'uuid'],
             'question_id' => ['nullable', 'uuid'],
-            'kind' => ['nullable', Rule::in(['evidence', 'signature'])],
-            'captured_at' => ['nullable', 'date', 'before_or_equal:+5 minutes'],
+            'kind' => ['nullable', Rule::in(['evidence', 'signature', 'checkin', 'checkout'])],
+            // Evidence must be taken live with the app's camera. The app labels every capture; a photo that claims any other
+            // origin (gallery, file picker) is refused. Signatures are drawn in the app and carry no camera.
+            'source' => [Rule::requiredIf(($request->input('kind') ?? 'evidence') !== 'signature'), 'nullable', Rule::in(['camera', 'drawn'])],
+            'captured_at' => ['nullable', 'date', 'before_or_equal:+5 minutes', 'after_or_equal:-3 days'],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['nullable', 'numeric', 'between:-180,180'],
         ]);
+        if (($data['kind'] ?? 'evidence') !== 'signature' && ($data['source'] ?? null) !== 'camera') {
+            throw new DomainRuleException('Photo evidence must be taken live with the camera, not picked from the gallery.', 'camera_required', 422);
+        }
         if (!empty($data['question_id']) && !FormQuestion::query()->whereKey($data['question_id'])->where('form_id', $v->form_id)->exists()) {
             throw new DomainRuleException('The question does not belong to this visit\'s form.', 'invalid_question');
         }

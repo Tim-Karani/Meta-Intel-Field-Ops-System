@@ -8,17 +8,14 @@ import { dataTable } from '../ui/table.js';
 import { formModal } from '../ui/crud.js';
 import { mapView, osmLink } from '../ui/map.js';
 import { lookup, enumOptions } from '../core/lookups.js';
-import { locationFields, positionBadge, geoSource } from './locations.js';
+import { positionBadge, geoSource } from './locations.js';
+import { openOutletForm } from '../ui/outlet-form.js';
 import { href, navigate } from '../core/router.js';
 
 export default async function render({ container, params }) {
   const holder = h('div'); container.append(holder);
   asyncView(holder, () => api.get(`locations/${params.id}`).then((r) => r.data), (loc, reload) => {
-    const edit = can('locations.manage') && h('button', { class: 'btn', type: 'button', onclick: async () => {
-      const [territories, clients, types] = await Promise.all([lookup('territories').catch(() => []), lookup('clients').catch(() => []), enumOptions('location_types').catch(() => [])]);
-      formModal({ title: 'Edit location', fields: locationFields(territories, clients, types), values: loc, submitLabel: 'Save changes', size: 'lg',
-        onSubmit: async (v) => { const o = { ...v }; if (o.geofence_radius_m === null) delete o.geofence_radius_m; await api.patch(`locations/${loc.id}`, o); toast('Location updated.'); }, onSaved: reload });
-    } }, icon('edit', { size: 16 }), 'Edit');
+    const edit = can('locations.manage') && h('button', { class: 'btn', type: 'button', onclick: () => openOutletForm({ location: loc, onSaved: reload }) }, icon('edit', { size: 16 }), 'Edit');
     const mapped = loc.latitude != null && loc.longitude != null;
     const lat = Number(loc.latitude); const lng = Number(loc.longitude);
     const confirm = can('locations.manage') && mapped && loc.needs_review && h('button', { class: 'btn primary', type: 'button', onclick: async (e) => {
@@ -29,10 +26,10 @@ export default async function render({ container, params }) {
       ? h('div', { class: 'alert warn' }, 'This outlet has no position yet. It is saved automatically from the first valid GPS check-in here (or edit the outlet to enter coordinates).')
       : loc.needs_review ? h('div', { class: 'alert info', style: { display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'space-between' } }, h('span', null, `${geoSource(loc.geo_source)}${loc.geo_accuracy_m != null ? ` (±${Math.round(loc.geo_accuracy_m)} m)` : ''}. Check the pin on the map, then confirm — or edit the coordinates.`), confirm) : null;
     return h('div', null,
-      pageHead({ title: loc.name, subtitle: [titleCase(loc.type), loc.town, loc.county].filter(Boolean).join(' · '), actions: [positionBadge(loc), badge(loc.status), edit] }), geoNote,
+      pageHead({ title: loc.name, subtitle: [loc.channel?.name, titleCase(loc.type), loc.town, loc.region].filter(Boolean).join(' · '), actions: [positionBadge(loc), badge(loc.outlet_status?.name || loc.status, { tone: loc.outlet_status?.tone === 'neutral' ? undefined : loc.outlet_status?.tone }), edit] }), geoNote,
       tabs([
         { key: 'overview', label: 'Overview', render: () => h('div', { class: 'grid cols-2' },
-          card('Details', kv([['Code', loc.code && h('span', { class: 'mono' }, loc.code)], ['Client', loc.client?.name], ['Territory', loc.territory?.name], ['Address', loc.address], ['Opening hours', loc.opening_hours],
+          card('Details', kv([['Code', loc.code && h('span', { class: 'mono' }, loc.code)], ['Chain', loc.channel?.name], ['Channel group', loc.channel?.channel_group], ['Sub-type', loc.outlet_subtype?.name], ['Setting', loc.setting && titleCase(loc.setting)], ['Mall / market', loc.market_name], ['Shop no.', loc.shop_no], ['Client', loc.client?.name], ['Territory', loc.territory?.name], ['Region', loc.region], ['Locality', loc.locality], ['Area', loc.town], ['Distributor', loc.distributor?.name], ['Shop phone / email', [loc.phone, loc.email].filter(Boolean).join(' · ') || null], ['Address', loc.address], ['Opening hours', loc.opening_hours],
             ['Contact', [loc.contact_name, loc.contact_phone].filter(Boolean).join(' · ') || null], ['Geofence', `${loc.geofence_radius_m ?? 100} m`], ['Coordinates', mapped ? h('a', { href: osmLink(lat, lng), target: '_blank', rel: 'noopener noreferrer' }, `${lat.toFixed(5)}, ${lng.toFixed(5)}`) : 'Not mapped yet'], ['Position source', mapped ? geoSource(loc.geo_source) : null], ['Added', loc.created_via === 'field' ? 'In the field by an agent' : null], ['Notes', loc.notes]])),
           card('Position', mapped ? mapView({ markers: [{ lat, lng, label: loc.name, radiusM: loc.geofence_radius_m }], height: 300, interactive: true }) : h('p', { class: 'muted' }, 'No map pin yet — it appears after the first check-in at this outlet.'))) },
         { key: 'visits', label: 'Visit history', render: () => dataTable({
