@@ -8,6 +8,7 @@ use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Support\ApiResponse;
 use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -32,11 +33,12 @@ class AuthController extends ApiController
         ]);
 
         $login = trim($data['login']);
-        $user = User::query()->where(fn ($q) => $q->where('email', strtolower($login))->orWhere('username', $login))->first();
+        $matches = User::query()->where(fn ($q) => $q->whereRaw('lower(email) = ?', [mb_strtolower($login)])->orWhere('username', $login))->get();
+        $user = self::loginAccount($matches, $login);
 
         if (!$user) {
             Hash::check($data['password'], self::dummyHash());   // equalise timing so unknown users are not detectable
-            SecurityEvents::log('login_failed', null, 'warning', ['reason' => 'unknown_user']);
+            SecurityEvents::log('login_failed', null, 'warning', $matches->isEmpty() ? ['reason' => 'unknown_user'] : ['reason' => 'ambiguous_email', 'match_count' => $matches->count()]);
             return ApiResponse::error('Invalid credentials.', 401, [], 'invalid_credentials');
         }
 
@@ -145,6 +147,23 @@ class AuthController extends ApiController
         }
 
         return $this->ok(null, 'Password has been reset. You can sign in now.');
+    }
+
+    /**
+     * The one account a login refers to, or null when there is none. Accounts whose emails differ only by capitals are never
+     * chosen between arbitrarily: only the address typed exactly as stored picks one of them, and nothing else is attempted,
+     * so a failed guess cannot add to the lockout count of an account the person may not own.
+     *
+     * @param Collection<int, User> $matches
+     */
+    private static function loginAccount(Collection $matches, string $login): ?User
+    {
+        if ($matches->count() <= 1) {
+            return $matches->first();
+        }
+        $exact = $matches->filter(fn (User $u) => $u->email === $login || $u->username === $login);
+
+        return $exact->count() === 1 ? $exact->first() : null;
     }
 
     private function tokenPayload(User $user, string $device): array

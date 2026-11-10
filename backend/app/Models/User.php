@@ -32,6 +32,12 @@ class User extends Authenticatable implements CanResetPasswordContract
     /** @var list<string>|null */
     private ?array $permissionCache = null;
 
+    /** Emails are stored in lower case so sign-in works however the address was typed. */
+    protected function email(): \Illuminate\Database\Eloquent\Casts\Attribute
+    {
+        return \Illuminate\Database\Eloquent\Casts\Attribute::make(set: fn ($v) => is_string($v) ? mb_strtolower(trim($v)) : $v);
+    }
+
     protected function casts(): array
     {
         return [

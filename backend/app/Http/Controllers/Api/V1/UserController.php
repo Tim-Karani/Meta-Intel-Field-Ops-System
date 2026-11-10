@@ -11,9 +11,12 @@ use App\Models\AgentProfile;
 use App\Models\Role;
 use App\Models\User;
 use App\Rules\Accessible;
+use App\Rules\UniqueEmail;
 use App\Support\DomainRuleException;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
@@ -37,7 +40,7 @@ class UserController extends ResourceController
         $id = $model?->getKey();
         return [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email:rfc', 'max:255', Rule::unique('users', 'email')->ignore($id)],
+            'email' => ['required', 'email:rfc', 'max:255', new UniqueEmail($id)],
             'username' => ['nullable', 'string', 'max:60', 'alpha_dash', Rule::unique('users', 'username')->ignore($id)],
             'phone' => ['nullable', 'string', 'max:40'],
             'password' => ['nullable', 'string', AuthController::passwordRule()],
@@ -136,13 +139,31 @@ class UserController extends ResourceController
 
     public function store(Request $request): JsonResponse
     {
-        $response = parent::store($request);
+        $response = $this->reportingDuplicateEmail(fn () => parent::store($request));
         if ($this->generatedPassword !== null) {
             $payload = $response->getData(true);
             $payload['data']['temporary_password'] = $this->generatedPassword;   // shown once; the user must change it at first login
             $response->setData($payload);
         }
         return $response;
+    }
+
+    public function update(Request $request, string $id): JsonResponse
+    {
+        return $this->reportingDuplicateEmail(fn () => parent::update($request, $id));
+    }
+
+    /** Two requests can both pass validation for the same address; the database stops the second, and the admin sees the usual message. */
+    private function reportingDuplicateEmail(Closure $action): JsonResponse
+    {
+        try {
+            return $action();
+        } catch (UniqueConstraintViolationException $e) {
+            if (!str_contains($e->getMessage(), 'users_email_unique')) {
+                throw $e;
+            }
+            throw ValidationException::withMessages(['email' => ['The email has already been taken.']]);
+        }
     }
 
     public function destroy(Request $request, string $id): JsonResponse

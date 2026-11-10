@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.9.1 - Sign-in fix for emails typed with capitals
+**Requires migration `2026_01_01_000015_v19_lowercase_emails` (run `migrate --force`), then run `php artisan users:email-conflicts`.** Take a database backup first: see Rollback below.
+- **Fix:** an account whose email was created with capital letters (for example `Demo.Andrew@example.com`) always answered "Invalid credentials" on the phone and the web, because sign-in looked for the lower-case address. Emails are now saved in lower case and sign-in ignores capitals.
+- **Migration:** lower-cases a stored email only when that account is the sole holder of the address. Accounts whose emails differ only by capitals (`Foo@x` and `foo@x`, or `Foo@x` and `FOO@x`) are all left unchanged. Accounts are never merged, deleted or given another account's address.
+- **Conflicts:** the migration warns with a count, and `php artisan users:email-conflicts` (read-only) lists the accounts it skipped. To resolve one, give each person a distinct address, then save each remaining account once so it is stored in lower case. Until then, those accounts can sign in only by typing the address exactly as stored, and password reset may not reach them.
+- **Duplicates:** creating or editing a user with an address already held in any capitalisation now gives the normal "already been taken" error instead of a server error. While a conflict exists, saving one of its accounts is refused if the request includes an address the other account also holds, so resolve the conflict by giving it a distinct address first.
+- **Rollback:** changes no data. The original capitalisation is not kept, so only a backup taken beforehand can restore it.
+
 ## 1.9.0 - Simpler menu and a project workspace (web only, no migration)
 - **Short menu.** About nine items: Home, Executive summary, Start a project, My projects, Outlets, Field team, Results, Setup, Admin. Field team, Results, Setup and Admin each open a page that groups the related screens, with one plain line on what each is for. Every old page still exists and is reached from its group; the menu highlights the right group while you are on it.
 - **Project workspace.** A project page now has five tabs: Overview, Setup (activities and KPIs), Outlets & team, Journey plans (plans and one-off assignments for that project), Visits & results (visits, issues, photos, reports).
