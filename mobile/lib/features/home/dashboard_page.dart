@@ -39,6 +39,9 @@ class DashboardPage extends ConsumerWidget {
     final clockedIn = attendance?['clock_in'] != null;
     final clockedOut = attendance?['clock_out'] != null;
     final progress = todays.isEmpty ? 0.0 : completed / todays.length;
+    final upcoming = todays.where((a) => !doneFor(a)).toList()..sort((x, y) => (x.startTime ?? '99:99').compareTo(y.startTime ?? '99:99'));
+    final nextStop = upcoming.isEmpty ? null : upcoming.first;
+    final canRequest = ref.watch(sessionProvider).can('journey.request');
 
     return Scaffold(
       appBar: AppBar(
@@ -56,17 +59,27 @@ class DashboardPage extends ConsumerWidget {
         child: ListView(padding: const EdgeInsets.all(16), children: [
           AppCard(
             color: Brand.ink,
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text("Today's work - ${fmtDate(today)}", style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 8),
-              Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text('$completed', style: const TextStyle(color: Brand.saffron, fontSize: 40, fontWeight: FontWeight.w800, height: 1)),
-                Padding(padding: const EdgeInsets.only(left: 8, bottom: 4), child: Text('of ${todays.length} completed', style: const TextStyle(color: Colors.white, fontSize: 16))),
-              ]),
-              const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: LinearProgressIndicator(value: progress, minHeight: 8, backgroundColor: Colors.white24, valueColor: const AlwaysStoppedAnimation(Brand.saffron)),
+            child: Row(children: [
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text("TODAY'S PROGRESS  -  ${fmtDate(today)}", style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, fontSize: 11.5, letterSpacing: .6)),
+                const SizedBox(height: 8),
+                Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Text('$completed', style: const TextStyle(color: Brand.saffron, fontSize: 44, fontWeight: FontWeight.w800, height: 1)),
+                  Padding(padding: const EdgeInsets.only(left: 6, bottom: 5), child: Text('/ ${todays.length}', style: const TextStyle(color: Colors.white, fontSize: 18))),
+                ]),
+                const Text('Visits completed', style: TextStyle(color: Colors.white70)),
+              ])),
+              SizedBox(
+                width: 76,
+                height: 76,
+                child: Stack(alignment: Alignment.center, children: [
+                  SizedBox(
+                    width: 76,
+                    height: 76,
+                    child: CircularProgressIndicator(value: progress, strokeWidth: 7, backgroundColor: Colors.white24, valueColor: const AlwaysStoppedAnimation(Brand.saffron)),
+                  ),
+                  Text('${(progress * 100).round()}%', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                ]),
               ),
             ]),
           ),
@@ -77,6 +90,22 @@ class DashboardPage extends ConsumerWidget {
             Expanded(child: _Stat('To do', '${pending < 0 ? 0 : pending}', Brand.ink)),
             const SizedBox(width: 10),
             Expanded(child: _Stat('Overdue', '${overdue.length}', overdue.isEmpty ? Brand.muted : Brand.bad)),
+          ]),
+          if (nextStop != null) ...[
+            SectionTitle('Next stop', trailing: TextButton(onPressed: () => context.go('/work'), child: const Text('View all'))),
+            _NextStop(a: nextStop, visit: byAssignment[nextStop.id]),
+          ],
+          const SectionTitle('Quick actions'),
+          Row(children: [
+            Expanded(child: _Quick(Icons.report_problem_outlined, 'Issue', () => context.push('/issues'))),
+            const SizedBox(width: 10),
+            Expanded(child: _Quick(Icons.alt_route, 'Routes', () => context.push('/routes'))),
+            const SizedBox(width: 10),
+            Expanded(child: _Quick(Icons.access_time, 'Attendance', () => context.push('/attendance'))),
+            if (canRequest) ...[
+              const SizedBox(width: 10),
+              Expanded(child: _Quick(Icons.edit_calendar_outlined, 'Plan change', () => context.push('/jp-request'))),
+            ],
           ]),
           const SectionTitle('Attendance'),
           AppCard(
@@ -179,6 +208,57 @@ class _StopTile extends StatelessWidget {
           Text('${a.campaignName}${a.startTime != null ? '  -  ${fmtTime(a.startTime)}' : ''}', style: const TextStyle(color: Brand.muted, fontSize: 13)),
         ])),
         StatusChip(status),
+      ]),
+    );
+  }
+}
+
+class _Quick extends StatelessWidget {
+  const _Quick(this.icon, this.label, this.onTap);
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => AppCard(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+        onTap: onTap,
+        child: Column(children: [
+          Icon(icon, color: Brand.ink),
+          const SizedBox(height: 6),
+          Text(label, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+        ]),
+      );
+}
+
+class _NextStop extends StatelessWidget {
+  const _NextStop({required this.a, required this.visit});
+  final AssignmentView a;
+  final LocalVisit? visit;
+
+  @override
+  Widget build(BuildContext context) {
+    final started = visit?.status == 'started' || visit?.status == 'completed';
+    return AppCard(
+      onTap: () => context.push('/assignment/${a.id}'),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(color: Brand.saffronSoft, borderRadius: BorderRadius.circular(20)),
+            child: Text(started ? 'In progress' : (a.startTime != null ? 'Next  -  ${fmtTime(a.startTime)}' : 'Next'), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+          ),
+          const Spacer(),
+          const Icon(Icons.chevron_right),
+        ]),
+        const SizedBox(height: 8),
+        Text(a.locationName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+        const SizedBox(height: 2),
+        Text([if (a.town != null) a.town!, a.campaignName].join('  -  '), style: const TextStyle(color: Brand.muted)),
+        if (a.activityName != null) ...[
+          const SizedBox(height: 6),
+          Row(children: [const Icon(Icons.bolt, size: 15, color: Brand.muted), const SizedBox(width: 4), Text(a.activityName!, style: const TextStyle(color: Brand.muted, fontSize: 13))]),
+        ],
       ]),
     );
   }

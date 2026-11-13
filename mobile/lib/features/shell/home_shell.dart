@@ -1,17 +1,50 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/ping_service.dart';
 import '../../state/providers.dart';
 import '../common/widgets.dart';
 
 /// Bottom navigation: Home, My work, Visits, Sync, More.
-class HomeShell extends ConsumerWidget {
+class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key, required this.shell});
   final StatefulNavigationShell shell;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeShell> createState() => _HomeShellState();
+}
+
+class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserver {
+  late final PingService _ping;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _ping = PingService(ref.read(sessionProvider), ref.read(locationServiceProvider));
+    WidgetsBinding.instance.addObserver(this);
+    _ping.send(force: true);
+    _timer = Timer.periodic(const Duration(minutes: 5), (_) => _ping.send());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _ping.send();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final shell = widget.shell;
     final sync = ref.watch(syncStateProvider).valueOrNull;
     final attention = (sync?.stuck ?? 0) > 0;
     final pending = sync?.pending ?? 0;

@@ -2,7 +2,7 @@ import { h } from '../core/dom.js';
 import { icon } from '../core/icons.js';
 import { api } from '../core/api.js';
 import { can, session, isClientUser, hasFeature } from '../core/auth.js';
-import { fmtMoney, fmtNumber, fmtPercent, fmtDate, titleCase, today } from '../core/format.js';
+import { fmtMoney, fmtNumber, fmtPercent, fmtDate, titleCase, today, initials, relTime } from '../core/format.js';
 import { asyncView, card, pageHead, stat, empty, badge } from '../ui/feedback.js';
 import { lineChart, donutChart, hBars } from '../ui/charts.js';
 import { mapView } from '../ui/map.js';
@@ -64,7 +64,7 @@ export default async function render({ container }) {
     const k = campaigns.find((x) => x.value === focus.campaign_id)?.label;
     return k ? `${c ? `${c} · ` : ''}${k}` : c ? `${c}, all campaigns` : 'all clients combined';
   };
-  reload = asyncView(host, loader, (d) => (d.kind === 'agent' ? agent(d) : operations(d, bar(), focusLabel())));
+  reload = asyncView(host, loader, (d) => (d.kind === 'agent' ? agent(d) : operations(d, bar(), focusLabel(), { ...focus })));
 }
 
 const STATUS_COLOR = { draft: '#94a3b8', planned: '#3a5a96', active: '#10b981', paused: '#f59e0b', completed: '#0ea5e9', archived: '#64748b' };
@@ -93,6 +93,61 @@ function delta(k, days, { invert = false } = {}) {
     `${flat ? '■' : up ? '▲' : '▼'} ${fmtNumber(Math.abs(k.delta), 1)}${k.delta_unit === 'pts' ? ' pts' : '%'}`, h('span', { class: 'delta-note' }, ` vs previous ${days} days`));
 }
 
+function greeting(d, label) {
+  const hr = new Date().getHours();
+  const hello = hr < 12 ? 'Good morning' : hr < 17 ? 'Good afternoon' : 'Good evening';
+  const first = session.user?.name?.split(' ')[0] || 'there';
+  const long = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+  return h('div', { class: 'greet' },
+    h('div', { class: 'greet-text' }, h('div', { class: 'eyebrow' }, long), h('h1', null, `${hello}, ${first}`),
+      h('p', { class: 'muted' }, `${fmtDate(d.period?.from)} to ${fmtDate(d.period?.to)} · ${label}`)),
+    h('div', { class: 'greet-actions' },
+      can('reports.view') && h('a', { class: 'btn', href: href('/executive') }, icon('download', { size: 16 }), 'Executive summary'),
+      can('agents.track') && h('a', { class: 'btn primary', href: href('/field-agents') }, icon('activity', { size: 16 }), 'Live operations')));
+}
+
+const STATUS = { in_app: { label: 'In app', tone: 'ok' }, offline: { label: 'Offline', tone: 'warn' }, not_started: { label: 'Not started', tone: 'plain' } };
+const ACTION = { checkin: 'Checked in', checkout: 'Checked out', submitted: 'Submitted a visit', started: 'Started a visit', created: 'Visit created', approved: 'Visit approved', rejected: 'Visit rejected' };
+
+/** Who is working right now (the same live data as Field agents). Only shown to people allowed to track agents. */
+function teamPanel() {
+  const host = h('div');
+  asyncView(host, () => api.get('agents/live', {}).then((r) => r.data), (res) => {
+    const rows = (res.data || []).slice(0, 8);
+    const sm = res.summary || {};
+    return h('div', null,
+      h('div', { class: 'team-sum' }, badge('in_app', { tone: 'ok', label: `${fmtNumber(sm.in_app || 0)} in app` }), badge('offline', { tone: 'warn', label: `${fmtNumber(sm.offline || 0)} offline` }), badge('not_started', { tone: 'plain', label: `${fmtNumber(sm.not_started || 0)} not started` })),
+      rows.length ? h('ul', { class: 'team-list' }, rows.map((r) => {
+        const pct = r.assigned_today ? Math.round((r.visits_today / r.assigned_today) * 100) : 0;
+        const st = STATUS[r.status] || STATUS.not_started;
+        return h('li', null,
+          h('a', { href: href('/field-agents') },
+            h('span', { class: 'mini-av' }, initials(r.name)),
+            h('span', { class: 'team-main' }, h('strong', null, r.name),
+              h('span', { class: 'small muted' }, r.last_action ? `${ACTION[r.last_action.type] || titleCase(r.last_action.type)} · ${r.last_action.location}` : (r.last_seen_at ? `Seen ${relTime(r.last_seen_at)}` : 'No activity yet'))),
+            h('span', { class: 'team-prog' }, h('span', { class: 'small' }, `${r.visits_today}/${r.assigned_today}`), h('span', { class: 'progress thin' }, h('span', { style: { width: `${Math.min(100, pct)}%` } }))),
+            badge(r.status, { tone: st.tone, label: st.label })));
+      })) : empty('No field agents yet', 'Add agents under Users and they appear here once they sign in.'),
+      h('a', { class: 'card-link', href: href('/field-agents') }, 'Open live operations', icon('chevronRight', { size: 14 })));
+  });
+  return card('Team right now', host);
+}
+
+/** The latest visits, newest first, for the project in focus. */
+function activityPanel(focus) {
+  const host = h('div');
+  const needProject = focus.client_id && !focus.campaign_id;
+  if (needProject) host.append(h('p', { class: 'muted' }, 'Pick a project in the Focus bar to see its latest activity.'));
+  else asyncView(host, () => api.get('visits', { per_page: 8, sort: '-submitted_at', ...(focus.campaign_id ? { campaign_id: focus.campaign_id } : {}) }), ({ data }) => (data.length
+    ? h('div', null, h('ul', { class: 'feed' }, data.map((v) => h('li', null,
+      h('span', { class: 'mini-av' }, initials(v.agent?.name)),
+      h('span', { class: 'feed-main' }, h('a', { href: href(`/visits/${v.id}`) }, h('strong', null, v.agent?.name || 'An agent')), h('span', null, ` ${v.status === 'submitted' || v.status === 'approved' ? 'submitted a visit' : titleCase(v.status || 'visit').toLowerCase()} at `), h('strong', null, v.location?.name || 'an outlet'),
+        h('span', { class: 'small muted', style: { display: 'block' } }, relTime(v.submitted_at || v.visit_date))),
+      badge(v.status)))), h('a', { class: 'card-link', href: href('/visits') }, 'All visits', icon('chevronRight', { size: 14 })))
+    : empty('No visits yet', 'Submitted visits appear here as they come in.')));
+  return card('Recent activity', host);
+}
+
 const kpi = (label, value, ic, k, days, opts) => h('div', { class: 'card kpi' },
   h('div', { class: 'label' }, label, h('span', { class: 'icon-wrap' }, icon(ic, { size: 16 }))), h('div', { class: 'value' }, value), delta(k, days, opts));
 
@@ -102,7 +157,7 @@ function progressCell(v, { goodAt = 80 } = {}) {
   return h('div', { class: 'cell-progress' }, h('div', { class: ['progress', tone] }, h('span', { style: { width: `${Math.max(2, Math.min(100, v))}%` } })), h('span', { class: 'small' }, fmtPercent(v, 0)));
 }
 
-function operations(d, bar, label) {
+function operations(d, bar, label, focus = {}) {
   const k = d.kpis || {};
   const days = d.period?.days || 14;
   const p = d.pulse;
@@ -157,7 +212,7 @@ function operations(d, bar, label) {
       card('Where agents checked in', points.length ? mapView({ markers: points, height: 340 }) : empty('No check-ins yet', 'Check-in locations for the selected period appear here.'))));
 
   return h('div', { class: 'dash' },
-    pageHead({ title: 'Dashboard', subtitle: `${fmtDate(d.period?.from)} to ${fmtDate(d.period?.to)} · ${label}` }),
+    greeting(d, label),
     bar,
     h('div', { class: 'grid cols-4' },
       kpi('Visits done', fmtNumber(k.visits_executed?.value), 'pin', k.visits_executed, days),
@@ -166,6 +221,7 @@ function operations(d, bar, label) {
       sales ? kpi('Sales', fmtMoney(k.sales_value?.value), 'dollar', k.sales_value, days)
         : kpi('On-shelf availability', k.osa_availability?.value == null ? 'No data' : fmtPercent(k.osa_availability.value), 'box', k.osa_availability, days)),
     h('div', { class: 'grid split' }, today || h('div'), attention),
+    h('div', { class: 'grid cols-2 dash-live' }, can('agents.track') && teamPanel(), can('visits.view') && activityPanel(focus)),
     card(`Visits per day · last ${days} days`, trend.some((t) => t.planned || t.completed)
       ? lineChart({ labels: trend.map((t) => t.date.slice(5)), series: [{ name: 'Planned', values: trend.map((t) => t.planned) }, { name: 'Completed', values: trend.map((t) => t.completed) }] })
       : empty('No visits in this period', 'The chart fills in as assignments are created and visits submitted.')),

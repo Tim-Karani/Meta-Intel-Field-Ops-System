@@ -24,6 +24,7 @@ Route::prefix('v1')->group(function () {
         Route::get('auth/me', [V1\AuthController::class, 'me']);
         Route::post('auth/refresh', [V1\AuthController::class, 'refresh']);
         Route::post('auth/logout', [V1\AuthController::class, 'logout']);
+        Route::patch('auth/profile', [V1\AuthController::class, 'updateProfile']);
         Route::post('auth/change-password', [V1\AuthController::class, 'changePassword']);
 
         Route::get('lookups/enums', [V1\LookupController::class, 'enums']);
@@ -253,6 +254,7 @@ Route::prefix('v1')->group(function () {
             Route::get('jp-requests', [V1\JpRequestController::class, 'index']);
             Route::get('jp-requests/{id}/proof', [V1\JpRequestController::class, 'proof']);
         });
+        Route::get('jp-requests/mine', [V1\JpRequestController::class, 'mine'])->middleware('permission:journey.request');
         Route::post('jp-requests', [V1\JpRequestController::class, 'store'])->middleware('permission:journey.request');
         Route::middleware('permission:journey.review')->group(function () {
             Route::post('jp-requests/{id}/approve', [V1\JpRequestController::class, 'approve']);

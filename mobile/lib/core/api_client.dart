@@ -52,12 +52,12 @@ class ApiClient {
   Future<dynamic> delete(String path) => _send(() => _dio.delete<dynamic>(path));
 
   /// Multipart upload (photos). [fields] values are sent as strings; null values are skipped.
-  Future<dynamic> upload(String path, {required String filePath, required String fileName, Map<String, Object?> fields = const {}}) async {
+  Future<dynamic> upload(String path, {required String filePath, required String fileName, Map<String, Object?> fields = const {}, String fileField = 'file'}) async {
     final form = FormData();
     fields.forEach((k, v) {
       if (v != null) form.fields.add(MapEntry(k, v.toString()));
     });
-    form.files.add(MapEntry('file', await MultipartFile.fromFile(filePath, filename: fileName)));
+    form.files.add(MapEntry(fileField, await MultipartFile.fromFile(filePath, filename: fileName)));
     return _send(() => _dio.post<dynamic>(path, data: form));
   }
 
@@ -76,6 +76,14 @@ class ApiClient {
       final r = await call();
       final body = r.data;
       if (body is Map<String, dynamic> && body.containsKey('success')) return body['data'];
+      // A web page (or empty text) instead of data means the address points at something other than the MetaIntel server.
+      if (body is String) {
+        throw ApiException(
+          kind: ApiErrorKind.network,
+          message: 'This address is not the MetaIntel server. Check the server address (it must end in /api/v1) and that the tunnel is running.',
+          status: r.statusCode,
+        );
+      }
       return body;
     } on DioException catch (e) {
       final ex = _convert(e);

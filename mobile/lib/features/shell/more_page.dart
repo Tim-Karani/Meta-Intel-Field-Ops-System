@@ -42,6 +42,10 @@ class MorePage extends ConsumerWidget {
         const SizedBox(height: 10),
         tile(Icons.alt_route, 'Routes', "Today's stops in order, with navigation", '/routes'),
         const SizedBox(height: 10),
+        if (user != null && ((user['permissions'] as List?)?.contains('journey.request') ?? false)) ...[
+          tile(Icons.edit_calendar_outlined, 'Journey plan change', 'Ask to add, remove or move an outlet', '/jp-request'),
+          const SizedBox(height: 10),
+        ],
         tile(Icons.report_problem_outlined, 'Issues', 'Report and review problems', '/issues'),
         const SizedBox(height: 10),
         tile(Icons.notifications_outlined, 'Notifications', 'Messages from your supervisor', '/notifications', badge: unread),

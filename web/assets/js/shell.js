@@ -2,7 +2,7 @@ import { h, clear, debounce } from './core/dom.js';
 import { icon } from './core/icons.js';
 import { session, canAny, can, roleName, scopeType, hasFeature } from './core/auth.js';
 import { api } from './core/api.js';
-import { initials } from './core/format.js';
+import { initials, relTime } from './core/format.js';
 import { NAV } from './nav.js';
 import { href, navigate } from './core/router.js';
 import { toast } from './ui/feedback.js';
@@ -15,7 +15,9 @@ export function createShell({ onLogout }) {
   const nav = h('nav', { class: 'nav', 'aria-label': 'Main' });
   const crumbs = h('div', { class: 'crumbs' });
   const main = h('main', { id: 'main', class: 'content', tabindex: '-1' });
-  const bell = h('a', { class: 'icon-btn', href: href('/notifications'), 'aria-label': 'Notifications' }, icon('bell'));
+  const bell = h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Notifications', 'aria-haspopup': 'true', onclick: (e) => { e.stopPropagation(); togglePanel(); } }, icon('bell'));
+  const panel = h('div', { class: 'menu notif-panel hidden', role: 'dialog', 'aria-label': 'Latest notifications' });
+  const notifWrap = can('notifications.view') ? h('div', { style: { position: 'relative' } }, bell, panel) : h('span');
   const shell = h('div', { class: 'shell' });
   let reviewBadge = null;
 
@@ -45,6 +47,46 @@ export function createShell({ onLogout }) {
   };
   document.addEventListener('click', () => toggle(false));
 
+  // ---- notifications panel: the latest few, without leaving the page ----
+  const noteTarget = (n) => {
+    const d = n.data || {};
+    if (d.visit_id && can('visits.view')) return `/visits/${d.visit_id}`;
+    if (d.issue_id && can('issues.view')) return `/issues?open=${d.issue_id}`;
+    if (d.assignment_id) return can('assignments.respond') ? '/my-work' : '/assignments';
+    return '/notifications';
+  };
+  async function togglePanel(force) {
+    const show = force ?? panel.classList.contains('hidden');
+    panel.classList.toggle('hidden', !show);
+    if (!show) return;
+    clear(panel); panel.append(h('div', { class: 'muted small', style: { padding: '12px' } }, 'Loading…'));
+    try {
+      const { data, meta } = await api.get('notifications', { per_page: 6 });
+      clear(panel);
+      panel.append(h('div', { class: 'np-head' }, h('strong', null, 'Notifications'), meta?.unread ? h('span', { class: 'badge info' }, `${meta.unread} unread`) : h('span', { class: 'muted small' }, 'All caught up')));
+      if (!data.length) panel.append(h('div', { class: 'muted', style: { padding: '14px' } }, 'Nothing yet. Alerts about assignments, reviews and issues appear here.'));
+      data.forEach((n) => panel.append(h('button', { type: 'button', class: ['np-item', !n.read_at && 'unread'], onclick: async () => {
+        togglePanel(false);
+        try { if (!n.read_at) { await api.post(`notifications/${n.id}/read`); document.dispatchEvent(new CustomEvent('notifications:changed')); } } catch { /* non-fatal */ }
+        navigate(noteTarget(n));
+      } }, h('span', { class: 'np-dot', 'aria-hidden': 'true' }), h('span', { class: 'np-txt' }, h('strong', null, n.title), n.body && h('span', { class: 'muted small' }, n.body), h('span', { class: 'muted small' }, relTime(n.created_at))))));
+      panel.append(h('a', { class: 'np-foot', href: href('/notifications'), onclick: () => togglePanel(false) }, 'View all notifications'));
+    } catch { clear(panel); panel.append(h('div', { class: 'muted', style: { padding: '14px' } }, 'Could not load notifications.')); }
+  }
+  document.addEventListener('click', (e) => { if (!e.target.closest('.notif-panel')) panel.classList.add('hidden'); });
+
+  // ---- "+ Create": the common starting points the person is allowed to use ----
+  const makeItems = [
+    ['Start a project', '/onboarding', 'flag', 'campaigns.create'],
+    ['Plan agents\' week', '/journey-plans', 'route', 'assignments.create'],
+    ['Add outlets', '/outlet-setup', 'pin', 'locations.manage'],
+    ['Add a user', '/users', 'user', 'users.create'],
+  ].filter((i) => can(i[3]));
+  const createMenu = h('div', { class: 'menu hidden', role: 'menu', style: { minWidth: '200px' } }, makeItems.map(([label, to, ic]) => h('a', { href: href(to), role: 'menuitem', onclick: () => createMenu.classList.add('hidden') }, icon(ic, { size: 16 }), label)));
+  const createBtn = makeItems.length ? h('div', { style: { position: 'relative' } },
+    h('button', { class: 'btn primary create-btn', type: 'button', 'aria-haspopup': 'menu', onclick: (e) => { e.stopPropagation(); createMenu.classList.toggle('hidden'); } }, icon('plus', { size: 16 }), 'Create'), createMenu) : h('span');
+  document.addEventListener('click', () => createMenu.classList.add('hidden'));
+
   const search = globalSearch();
   const focusBar = scopeBar();
 
@@ -56,7 +98,7 @@ export function createShell({ onLogout }) {
     h('div', { class: 'main-col' },
       h('header', { class: 'topbar' },
         h('button', { class: 'icon-btn menu-btn', type: 'button', 'aria-label': 'Open menu', onclick: () => shell.classList.add('nav-open') }, icon('menu')),
-        crumbs, h('span', { class: 'spacer' }), focusBar.el, search, bell,
+        crumbs, h('span', { class: 'spacer' }), focusBar.el, search, createBtn, notifWrap,
         h('div', { style: { position: 'relative' } }, chip, userMenu)),
       main));
 

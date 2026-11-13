@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.10.0 - New dashboard, notifications panel, phone Home and plan-change requests
+**Web:** replace the files (cache-bust is now 22), hard-refresh. **Server:** rebuild the image (one new read-only endpoint, no migration). **Phone:** new APK (`flutter pub get` first: one new package, `battery_plus`).
+- **Dashboard (web).** A greeting with today's date and two shortcuts (Executive summary, Live operations), then the existing KPI cards, today's pulse and "Needs attention", and two new panels: **Team right now** (who is in the app, offline or not started, with each person's visits today; same live data as Field agents, shown only to people allowed to track agents) and **Recent activity** (the latest submitted visits for the project in focus). Nothing is sample data.
+- **Top bar (web).** A **+ Create** menu (Start a project, Plan agents' week, Add outlets, Add a user, each shown only if your role may do it) and a **notifications panel** that opens under the bell with the latest six, marks one read when opened and takes you to the item.
+- **Phone Home.** Progress ring for today, a **Next stop** card (time, outlet, project, activity) and **Quick actions** (Issue, Routes, Attendance, Plan change).
+- **Phone: journey-plan change request.** More > Journey plan change (and the Quick action): ask to move, remove or add an outlet, with a reason, optional photo and your location as proof. It is sent straight to the server (needs a connection; it says so if offline). New read-only endpoint `GET /jp-requests/mine` (your own plans only).
+- **Phone: location and battery ping.** The app now reports its position and battery when it opens, when it returns to the foreground and every 5 minutes while open, so Field agents and the new Team panel show real status. It never prompts for permission, and it is not background tracking: nothing is sent when the app is closed.
+- **My profile is now editable.** Name, email, username and phone can be changed from My profile. Changing the email asks for your current password; role, client and status can never be changed there. The "Client" line is hidden for people who have no client (such as the System Administrator). New endpoint `PATCH /auth/profile`; changes are audited.
+- Tests added: `JpRequestMineTest`, `ProfileUpdateTest`. Not run here: PHPUnit and Flutter cannot run in the build environment, so run both before relying on this release.
+
+## 1.9.2 - Phone app: clear message for a wrong server address (app rebuild only, no server change)
+- **Fix:** pointing the app at an address that is not the MetaIntel server (an old tunnel, a web page) used to show "type 'String' is not a subtype...". It now says "This address is not the MetaIntel server. Check the server address (it must end in /api/v1)...".
+- App version is now one number everywhere: `pubspec.yaml` 1.9.1+2 and the in-app version 1.9.1 (it said 1.4.0).
+- Removed the unused `outletAdders` project rule (add-outlet is a per-agent switch since 1.8.0).
+- Needs a new APK build; nothing to run on the server.
+
 ## 1.9.1 - Sign-in fix for emails typed with capitals
 **Requires migration `2026_01_01_000015_v19_lowercase_emails` (run `migrate --force`), then run `php artisan users:email-conflicts`.** Take a database backup first: see Rollback below.
 - **Fix:** an account whose email was created with capital letters (for example `Demo.Andrew@example.com`) always answered "Invalid credentials" on the phone and the web, because sign-in looked for the lower-case address. Emails are now saved in lower case and sign-in ignores capitals.

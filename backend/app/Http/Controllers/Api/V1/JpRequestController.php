@@ -57,6 +57,30 @@ class JpRequestController extends ApiController
         return $this->ok($rows->map(fn ($r) => $this->present($r))->all());
     }
 
+    /**
+     * What the phone needs to ask for a change: the agent's own active plans, their stops by weekday, and the project's outlets
+     * (for "add"). Own plans only; nothing about other people.
+     */
+    public function mine(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $plans = JourneyPlan::query()->where('agent_id', $user->getKey())->where('status', 'active')
+            ->with(['campaign:id,name', 'stops.location:id,name,town'])->orderBy('name')->get();
+        $out = $plans->map(function (JourneyPlan $p) {
+            $outlets = DB::table('campaign_locations')->join('locations', 'locations.id', '=', 'campaign_locations.location_id')
+                ->where('campaign_locations.campaign_id', $p->campaign_id)->whereNull('locations.deleted_at')
+                ->orderBy('locations.name')->limit(300)->get(['locations.id', 'locations.name', 'locations.town']);
+
+            return [
+                'id' => $p->id, 'name' => $p->name, 'campaign' => $p->campaign?->only(['id', 'name']),
+                'stops' => $p->stops->map(fn ($st) => ['location_id' => $st->location_id, 'weekday' => (int) $st->weekday, 'name' => $st->location?->name, 'town' => $st->location?->town])->values()->all(),
+                'outlets' => $outlets->map(fn ($o) => ['id' => $o->id, 'name' => $o->name, 'town' => $o->town])->all(),
+            ];
+        })->values()->all();
+
+        return $this->ok($out);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $user = $request->user();

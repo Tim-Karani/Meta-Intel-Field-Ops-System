@@ -21,6 +21,7 @@ import '../features/visits/visit_page.dart';
 import '../features/visits/visits_page.dart';
 import '../features/work/assignment_detail_page.dart';
 import '../features/work/assignments_page.dart';
+import '../features/work/jp_request_page.dart';
 import '../features/work/routes_page.dart';
 
 GoRouter buildRouter(Session session) {
@@ -56,6 +57,7 @@ GoRouter buildRouter(Session session) {
       GoRoute(path: '/visit/:id/photos', builder: (c, s) => PhotosPage(visitId: s.pathParameters['id']!)),
       GoRoute(path: '/outlet/new', builder: (c, s) => const AddOutletPage()),
       GoRoute(path: '/attendance', builder: (c, s) => const AttendancePage()),
+      GoRoute(path: '/jp-request', builder: (c, s) => const JpRequestPage()),
       GoRoute(path: '/routes', builder: (c, s) => const RoutesPage()),
       GoRoute(path: '/issues', builder: (c, s) => const IssuesPage()),
       GoRoute(path: '/notifications', builder: (c, s) => const NotificationsPage()),

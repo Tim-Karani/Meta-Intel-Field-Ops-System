@@ -127,12 +127,11 @@ class AssignmentView {
 
 /// What a project asks of the agent on a visit. Mirrors the server's ProjectSettings.
 class ProjectRules {
-  const ProjectRules({this.tasks = const {}, this.minPhotos = 0, this.visitLabel = 'Visit', this.outletAdders = 'all', this.visitPhotos = true});
+  const ProjectRules({this.tasks = const {}, this.minPhotos = 0, this.visitLabel = 'Visit', this.visitPhotos = true});
 
   final Map<String, bool> tasks;
   final int minPhotos;
   final String visitLabel;
-  final String outletAdders;
 
   /// Check-in and check-out photos are required (they prove the assigned agent is the one at the outlet).
   final bool visitPhotos;
@@ -144,7 +143,6 @@ class ProjectRules {
       tasks: {for (final k in const ['form', 'sales', 'osa', 'merchandising', 'photos']) k: t[k] != false},
       minPhotos: s.integer('min_photos') ?? 0,
       visitLabel: (s.str('visit_label') ?? '').trim().isEmpty ? 'Visit' : s.str('visit_label')!.trim(),
-      outletAdders: s.str('outlet_adders') ?? 'all',
       visitPhotos: s['visit_photos'] != false,
     );
   }

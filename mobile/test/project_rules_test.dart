@@ -19,13 +19,11 @@ void main() {
         'tasks': {'form': true, 'sales': false, 'osa': true, 'merchandising': true, 'photos': true},
         'min_photos': 2,
         'visit_label': 'Activation',
-        'outlet_adders': 'none',
       });
       expect(r.taskOn('sales'), isFalse);
       expect(r.taskOn('osa'), isTrue);
       expect(r.minPhotos, 2);
       expect(r.visitLabel, 'Activation');
-      expect(r.outletAdders, 'none');
     });
   });
 

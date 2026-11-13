@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../core/api_exception.dart';
 import '../core/api_client.dart';
 import '../core/config.dart';
 import '../core/secure_store.dart';
@@ -83,7 +84,13 @@ class Session extends ChangeNotifier {
       'login': login.trim(),
       'password': password,
       'device_name': 'Field app ${AppConfig.appVersion}',
-    }) as Map<String, dynamic>;
+    });
+    if (data is! Map || data['user'] is! Map || data['token'] == null) {
+      throw ApiException(
+        kind: ApiErrorKind.network,
+        message: 'This address is not the MetaIntel server. Check the server address (it must end in /api/v1).',
+      );
+    }
     final user = (data['user'] as Map).cast<String, dynamic>();
     final perms = user.list('permissions').map((e) => e.toString()).toSet();
     if (!perms.contains('assignments.view') || !perms.contains('visits.create')) {

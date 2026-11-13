@@ -341,3 +341,29 @@ details.more .more-body { display:grid; gap:24px; padding-top:12px; }
 .next-step .tx { flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .next-step .tx span { font-size: 13px; color: var(--text-3); }
 .next-step.done .tx b { color: var(--text-3); font-weight: 600; }
+
+/* ---- v1.10 dashboard: greeting, live team, activity, notifications panel, create button ---- */
+.greet { display:flex; align-items:flex-end; gap:16px; flex-wrap:wrap; margin-bottom:16px; }
+.greet-text { flex:1; min-width:260px; } .greet .eyebrow { font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--accent-600); font-weight:700; }
+.greet h1 { margin:2px 0 2px; font-size:26px; letter-spacing:-.5px; } .greet-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.dash .kpi { border-radius:14px; padding:18px 20px; transition:box-shadow .15s; } .dash .kpi:hover { box-shadow:var(--shadow); }
+.dash .kpi .icon-wrap { width:36px; height:36px; border-radius:10px; background:var(--accent-50); color:var(--accent-600); }
+.dash .kpi .value { font-size:30px; }
+.dash .grid { margin-bottom:16px; }
+.dash-live { align-items:start; }
+.team-sum { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+.team-list, .feed { list-style:none; margin:0; padding:0; } .team-list li, .feed li { border-bottom:1px solid var(--border); } .team-list li:last-child, .feed li:last-child { border-bottom:0; }
+.team-list a { display:flex; align-items:center; gap:10px; padding:9px 2px; color:var(--text); text-decoration:none; } .team-list a:hover { background:var(--surface-2); }
+.mini-av { width:30px; height:30px; border-radius:50%; background:var(--accent-100); color:var(--accent-700); font-size:11px; font-weight:700; display:grid; place-items:center; flex:none; }
+.team-main { flex:1; min-width:0; display:flex; flex-direction:column; } .team-main .small { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.team-prog { width:64px; display:flex; flex-direction:column; gap:3px; align-items:flex-end; } .progress.thin { height:4px; width:100%; }
+.feed li { display:flex; align-items:flex-start; gap:10px; padding:9px 2px; } .feed-main { flex:1; min-width:0; }
+.card-link { display:inline-flex; align-items:center; gap:4px; margin-top:10px; font-weight:600; font-size:13px; }
+.create-btn { gap:6px; }
+.notif-panel { width:360px; max-width:92vw; padding:0; overflow:hidden; }
+.np-head { display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--border); }
+.np-item { display:flex !important; align-items:flex-start; gap:10px; padding:10px 14px !important; border-radius:0 !important; border-bottom:1px solid var(--border) !important; }
+.np-txt { display:flex; flex-direction:column; gap:1px; flex:1; min-width:0; } .np-dot { width:8px; height:8px; border-radius:50%; background:transparent; margin-top:6px; flex:none; }
+.np-item.unread .np-dot { background:var(--accent-500); }
+.np-foot { justify-content:center; font-weight:600; padding:10px !important; border-radius:0 !important; }
+@media (max-width:720px) { .greet h1 { font-size:22px; } .search-box { width:140px; } .create-btn { padding:6px 10px; } }

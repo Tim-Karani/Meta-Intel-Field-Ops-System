@@ -3,7 +3,7 @@
 class AppConfig {
   static const String defaultBaseUrl =
       String.fromEnvironment('API_BASE_URL', defaultValue: 'http://10.0.2.2:8080/api/v1');
-  static const String appVersion = '1.4.0';
+  static const String appVersion = '1.10.0';
 
   /// A failed (non-network) attempt is retried this many times before the item waits for manual retry.
   static const int maxRetries = 8;

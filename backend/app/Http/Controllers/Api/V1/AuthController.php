@@ -6,6 +6,7 @@ use App\Domain\Audit\AuditService;
 use App\Domain\Audit\SecurityEvents;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Rules\UniqueEmail;
 use App\Support\ApiResponse;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Database\Eloquent\Collection;
@@ -94,6 +95,41 @@ class AuthController extends ApiController
         $request->user()->currentAccessToken()->delete();
 
         return $this->ok(null, 'Signed out.');
+    }
+
+    /**
+     * Self-service profile: name, email, username and phone only. Role, client, status and permissions are never changed here.
+     * Changing the sign-in email needs the current password, so a borrowed open session cannot take the account over.
+     */
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', new UniqueEmail($user->getKey())],
+            'username' => ['nullable', 'string', 'max:60', 'alpha_dash', \Illuminate\Validation\Rule::unique('users', 'username')->ignore($user->getKey())],
+            'phone' => ['nullable', 'string', 'max:40'],
+            'current_password' => ['nullable', 'string'],
+        ]);
+
+        $newEmail = mb_strtolower(trim($data['email']));
+        $emailChanged = $newEmail !== mb_strtolower((string) $user->email);
+        if ($emailChanged && !Hash::check((string) ($data['current_password'] ?? ''), $user->password)) {
+            return ApiResponse::error('Enter your current password to change your email.', 422, ['current_password' => ['Enter your current password to change your email.']], 'validation_failed');
+        }
+
+        $before = $user->only(['name', 'email', 'username', 'phone']);
+        $user->forceFill([
+            'name' => trim($data['name']), 'email' => $newEmail,
+            'username' => ($data['username'] ?? '') === '' ? null : $data['username'],
+            'phone' => ($data['phone'] ?? '') === '' ? null : trim($data['phone']),
+        ])->save();
+        AuditService::record('profile.updated', 'auth', $user, $before, $user->only(['name', 'email', 'username', 'phone']));
+        if ($emailChanged) {
+            SecurityEvents::log('email_changed', $user->getKey());
+        }
+
+        return $this->ok(UserResource::session($user->refresh()), 'Profile saved.');
     }
 
     public function changePassword(Request $request): JsonResponse
