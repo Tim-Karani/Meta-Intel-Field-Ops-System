@@ -1,4 +1,5 @@
 import { h } from '../core/dom.js';
+import { icon } from '../core/icons.js';
 
 /* Declarative form builder with server-side error mapping.
    fields: [{ name, label, type, required, options, help, full, placeholder, rows, min, max, step, maxlength, value, hidden, tab }]
@@ -25,7 +26,7 @@ export function buildForm(fields, values = {}) {
       ? h('div', { class: ['field', f.full && 'full'] }, h('label', { class: 'check', for: id }, control.el, f.label), f.help && h('div', { class: 'help' }, f.help), err)
       : h('div', { class: ['field', (f.full || f.type === 'textarea' || f.type === 'multiselect') && 'full'] },
         h('label', { for: id, class: f.type === 'multiselect' ? 'lbl' : null }, f.label, f.required && h('span', { class: 'req', 'aria-hidden': 'true' }, ' *')),
-        control.el, f.help && h('div', { class: 'help' }, f.help), f.after ? f.after({ set: (n, v) => set(n, v), read: () => read() }) : null, err);
+        control.node || control.el, f.help && h('div', { class: 'help' }, f.help), f.after ? f.after({ set: (n, v) => set(n, v), read: () => read() }) : null, err);
     if (tabNames.length > 1 && f.tab) { panes.get(f.tab).append(wrap); tabOf.set(f.name, f.tab); } else grid.append(wrap);
   }
 
@@ -111,6 +112,19 @@ function makeControl(f, id, initial, errId) {
       };
       paint(f.options || []);
       return { el: wrap, get: () => [...selected], set: (v) => { selected = new Set(v || []); paint(f.options || []); }, setOptions: (opts) => { f.options = opts; paint(opts); } };
+    }
+    case 'password': {
+      // A password box with an eye button to show what was typed. The input stays `el` (focus, errors); `node` is what is placed on the page.
+      const el = h('input', { ...common, class: 'input', type: 'password', value: initial ?? '', spellcheck: 'false', autocapitalize: 'off' });
+      const btn = h('button', { class: 'pw-toggle', type: 'button', 'aria-label': 'Show password', 'aria-pressed': 'false', title: 'Show password' }, icon('eye', { size: 18 }));
+      btn.addEventListener('click', () => {
+        const show = el.type === 'password';
+        el.type = show ? 'text' : 'password';
+        btn.replaceChildren(icon(show ? 'eyeOff' : 'eye', { size: 18 }));
+        btn.setAttribute('aria-pressed', String(show)); btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password'); btn.title = show ? 'Hide password' : 'Show password';
+        el.focus();
+      });
+      return { el, node: h('div', { class: 'pw-wrap' }, el, btn), get: () => el.value, set: (v) => { el.value = v ?? ''; } };
     }
     default: {
       const type = ['number', 'decimal'].includes(f.type) ? 'number' : (f.type || 'text');

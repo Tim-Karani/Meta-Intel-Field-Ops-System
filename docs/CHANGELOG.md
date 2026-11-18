@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.10.1 - Show/hide password on the web (web only, no rebuild, no migration)
+- Every password box on the web (sign in, reset password, change password, new user's initial password, profile) has an eye button to show or hide what you typed. The phone app's sign-in already had it, and it has no other password box.
+- Cache-bust is now 23.
+
+## 1.10.1 - Cloudflare R2 photo storage (optional)
+**Rebuild the image** (one new package, `league/flysystem-aws-s3-v3`). No migration. Nothing changes until you set `EVIDENCE_DISK=s3` in `backend/.env`; photos already saved stay where they are (each photo remembers its disk). Steps are in `docs/CLOUDFLARE_SETUP.md`; System health > evidence storage shows whether the bucket works.
+
 ## 1.10.0 - New dashboard, notifications panel, phone Home and plan-change requests
 **Web:** replace the files (cache-bust is now 22), hard-refresh. **Server:** rebuild the image (one new read-only endpoint, no migration). **Phone:** new APK (`flutter pub get` first: one new package, `battery_plus`).
 - **Dashboard (web).** A greeting with today's date and two shortcuts (Executive summary, Live operations), then the existing KPI cards, today's pulse and "Needs attention", and two new panels: **Team right now** (who is in the app, offline or not started, with each person's visits today; same live data as Field agents, shown only to people allowed to track agents) and **Recent activity** (the latest submitted visits for the project in focus). Nothing is sample data.

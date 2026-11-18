@@ -367,3 +367,8 @@ details.more .more-body { display:grid; gap:24px; padding-top:12px; }
 .np-item.unread .np-dot { background:var(--accent-500); }
 .np-foot { justify-content:center; font-weight:600; padding:10px !important; border-radius:0 !important; }
 @media (max-width:720px) { .greet h1 { font-size:22px; } .search-box { width:140px; } .create-btn { padding:6px 10px; } }
+
+/* password box with show/hide */
+.pw-wrap { position:relative; } .pw-wrap .input { padding-right:42px; }
+.pw-toggle { position:absolute; right:4px; top:50%; transform:translateY(-50%); width:34px; height:34px; display:grid; place-items:center; border:0; background:transparent; color:var(--text-3); border-radius:8px; cursor:pointer; }
+.pw-toggle:hover { background:var(--neutral-bg); color:var(--text); }
