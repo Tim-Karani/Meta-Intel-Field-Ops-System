@@ -1,5 +1,33 @@
 # Changelog
 
+## 1.11.2 - Test suite green-up and three real fixes
+- Fixed: a malformed ID (for example `not-a-uuid`) in a form field made the server answer 500; it now answers 422 with a normal validation message (Accessible rule and the `exists` rules).
+- Fixed: saving a conditional answer on its own (for example "Why not?") lost it, because the controlling answer was not in the same request. Saved answers are now taken into account.
+- Changed: usernames may contain dots (for example `tim.karani`), as well as letters, numbers, dashes and underscores.
+- Tests: roles are seeded directly (not through `db:seed`); tests always use a fake evidence disk; older tests updated for least privilege and review by exception.
+
+## 1.11.1 - Email test, status page (server rebuild + web refresh; no migration)
+- **System health > Email:** shows which mail setting is active, warns when email is only written to the log, and has a **Send test email** button (`POST /system/test-email`, administrators only, limited to 6 a minute, audited). New `docs/EMAIL_SETUP.md` explains how to connect a real sender.
+- New `docs/STATUS.md` (what is built, what is verified, what is open). The release guide now has the "address built into the app" reminders.
+- Tests added: `TestEmailTest` (not run here). Cache-bust is now 24. Rebuild the image: `docker compose build app queue scheduler`, then `up -d`.
+
+## 1.11.0 - Phone: barcode scanning, background sync, phone notifications, release signing (NEW APK; no server change)
+**Phone only.** In `mobile/`: `flutter pub get` (three new packages), `flutter test`, `flutter build apk --release`. First read `docs/SIGNING_AND_RELEASE.md`. Not compiled or run here (no Flutter in the build environment): build it, and send the first red error if one appears.
+- **Barcode scanning.** The "barcode" form question has a scan button (typing still works), and the product picker has a scan button that selects the product whose SKU matches. Needs the camera permission the app already asks for. Android 6 or newer.
+- **Background sync.** About every 15 minutes (the shortest Android allows), while the phone has a connection, the app sends saved work and fetches new work even when closed. It skips a run when the app is open, and it never reads the phone's location in the background.
+- **Phone notifications.** The same background run shows a phone notification for new assignments and reviews (the first run only records what is already there). Android 13 and newer ask for permission once. This is not instant push: it arrives within about 15 minutes. Instant push needs a free Firebase project and server work; it can be added later.
+- **Release signing.** The build now signs with your own key when `mobile/android/key.properties` exists (see the guide); otherwise it falls back to the test key as before.
+- `scripts/run-tests.ps1`: runs the backend tests and saves `test-results.txt`.
+
+## 1.10.3 - Live-server kit (files and documents only, no rebuild of the laptop stack)
+- `docker-compose.prod.yml` and `docker/caddy/Caddyfile`: Caddy in front of nginx gives the free HTTPS padlock automatically; nginx is no longer open to the internet.
+- `.env.server.example`, `scripts/backup.sh` (daily database copy, keeps 14 days), `docs/SERVER_SETUP.md` (step by step: server, Namecheap DNS record, firewall, deploy, backups).
+- `.gitignore` now allows `.env.server.example` and `backend/.env.production.example` to be committed (the `.env.*` rule was hiding them).
+
+## 1.10.2 - Pilot-test pack (documents and settings only, no code, no rebuild, no migration)
+- `docs/PILOT_TEST.md`: checklist for the first outlet test.
+- `backend/.env.production.example`: the live-install settings. **Add `TRUSTED_PROXIES=*` to your `backend/.env`** and run `docker compose up -d --force-recreate app queue scheduler`; the server already supports it, it was just not turned on, so behind the tunnel every tester shared one sign-in limit.
+
 ## 1.10.1 - Show/hide password on the web (web only, no rebuild, no migration)
 - Every password box on the web (sign in, reset password, change password, new user's initial password, profile) has an eye button to show or hide what you typed. The phone app's sign-in already had it, and it has no other password box.
 - Cache-bust is now 23.

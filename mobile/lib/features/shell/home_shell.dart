@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/background_sync.dart';
+import '../../core/notify_service.dart';
 import '../../core/ping_service.dart';
+import '../../core/util.dart';
 import '../../state/providers.dart';
 import '../common/widgets.dart';
 
@@ -20,6 +23,7 @@ class HomeShell extends ConsumerStatefulWidget {
 class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserver {
   late final PingService _ping;
   Timer? _timer;
+  Timer? _beat;
 
   @override
   void initState() {
@@ -28,16 +32,34 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
     WidgetsBinding.instance.addObserver(this);
     _ping.send(force: true);
     _timer = Timer.periodic(const Duration(minutes: 5), (_) => _ping.send());
+    // Tell the background sync the app is open, so the two never run together; then make sure it is scheduled.
+    _markOpen();
+    _beat = Timer.periodic(const Duration(minutes: 1), (_) => _markOpen());
+    BackgroundSync.register();
+    _askNotifications();
+  }
+
+  void _markOpen() => ref.read(repoProvider).setMeta('foreground_at', nowIso());
+
+  Future<void> _askNotifications() async {
+    final repo = ref.read(repoProvider);
+    if (await repo.meta('notif_asked') != null) return;
+    await repo.setMeta('notif_asked', '1');
+    await NotifyService.requestPermission();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _ping.send();
+    if (state == AppLifecycleState.resumed) {
+      _markOpen();
+      _ping.send();
+    }
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _beat?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

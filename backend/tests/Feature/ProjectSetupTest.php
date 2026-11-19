@@ -72,7 +72,7 @@ class ProjectSetupTest extends DatabaseTestCase
 
     public function test_the_switch_is_set_per_person_by_the_office(): void
     {
-        $this->s->actingAs($this->s->ops);
+        $this->s->actingAs($this->s->admin);   // editing people is an administrator task (least privilege)
         $this->api('PATCH', "users/{$this->s->otherAgent->id}", ['can_add_outlets' => true])->assertOk()->assertJsonPath('data.agent_profile.can_add_outlets', true);
         $this->assertTrue((bool) \DB::table('agent_profiles')->where('user_id', $this->s->otherAgent->id)->value('can_add_outlets'));
         $this->api('PATCH', "users/{$this->s->otherAgent->id}", ['can_add_outlets' => false])->assertOk()->assertJsonPath('data.agent_profile.can_add_outlets', false);

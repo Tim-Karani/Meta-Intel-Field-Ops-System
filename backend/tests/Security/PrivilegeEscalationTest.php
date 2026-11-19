@@ -129,7 +129,7 @@ class PrivilegeEscalationTest extends DatabaseTestCase
 
     public function test_every_non_trivial_route_declares_a_permission_gate(): void
     {
-        $open = ['api/v1/auth/me', 'api/v1/auth/refresh', 'api/v1/auth/logout', 'api/v1/auth/change-password', 'api/v1/lookups/enums', 'api/v1/lookups/{entity}',
+        $open = ['api/v1/auth/me', 'api/v1/auth/refresh', 'api/v1/auth/logout', 'api/v1/auth/change-password', 'api/v1/auth/profile', 'api/v1/lookups/enums', 'api/v1/lookups/{entity}',
             'api/v1/health', 'api/v1/auth/login', 'api/v1/auth/forgot-password', 'api/v1/auth/reset-password'];
         foreach (\Illuminate\Support\Facades\Route::getRoutes() as $route) {
             $uri = $route->uri();

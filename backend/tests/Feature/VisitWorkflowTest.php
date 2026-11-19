@@ -44,6 +44,7 @@ class VisitWorkflowTest extends DatabaseTestCase
 
     public function test_full_lifecycle_from_assignment_to_client_visibility(): void
     {
+        $this->s->locationA->update(['needs_review' => true]);   // these tests cover manual review; clean visits are approved automatically
         $id = $this->startVisit();
         $this->completeVisit($id);
         $this->api('POST', "visits/$id/submit")->assertOk()->assertJsonPath('data.status', 'submitted');
@@ -156,6 +157,7 @@ class VisitWorkflowTest extends DatabaseTestCase
 
     public function test_rejection_requires_a_reason_and_reopens_the_assignment(): void
     {
+        $this->s->locationA->update(['needs_review' => true]);   // these tests cover manual review; clean visits are approved automatically
         $id = $this->startVisit();
         $this->completeVisit($id);
         $this->api('POST', "visits/$id/submit")->assertOk();

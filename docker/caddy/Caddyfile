@@ -1,0 +1,6 @@
+# {$APP_DOMAIN} comes from the root .env. Caddy requests and renews the HTTPS certificate automatically
+# (the DNS record must already point at this server and ports 80 and 443 must be open).
+{$APP_DOMAIN} {
+	encode gzip
+	reverse_proxy web:80
+}

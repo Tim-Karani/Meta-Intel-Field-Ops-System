@@ -232,7 +232,11 @@ class VisitService
             throw new DomainRuleException('This visit has no form.', 'no_form');
         }
 
-        $result = $this->forms->validate($visit->form, $answers, $visit->campaign_id, false);
+        // Visibility of conditional questions depends on answers already saved, so a partial save ("Why not?" on its own) must see them.
+        $saved = $visit->responses()->pluck('value', 'question_id')->all();
+        $result = $this->forms->validate($visit->form, $answers + $saved, $visit->campaign_id, false);
+        $result['normalized'] = array_intersect_key($result['normalized'], $answers);
+        $result['errors'] = array_intersect_key($result['errors'], $answers);
         if ($result['errors']) {
             throw ValidationException::withMessages(collect($result['errors'])->mapWithKeys(fn ($m, $q) => ["answers.$q" => [$m]])->all());
         }

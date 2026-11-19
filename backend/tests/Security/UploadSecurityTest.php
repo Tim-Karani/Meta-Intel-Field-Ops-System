@@ -108,12 +108,15 @@ class UploadSecurityTest extends DatabaseTestCase
 
     public function test_reusing_the_same_photo_on_another_visit_raises_a_security_event(): void
     {
-        $file = fn () => UploadedFile::fake()->createWithContent('same.jpg', file_get_contents(UploadedFile::fake()->image('x.jpg', 64, 64)->getRealPath()));
+        $img = UploadedFile::fake()->image('x.jpg', 64, 64);   // kept in a variable: its temp file is deleted when the object is released
+        $bytes = file_get_contents($img->getRealPath());
+        $file = fn () => UploadedFile::fake()->createWithContent('same.jpg', $bytes);
         $this->upload($file())->assertCreated();
 
         // A second visit (new assignment) re-submits byte-identical evidence.
         $this->api('POST', "visits/{$this->visit}/check-out", Scenario::gps())->assertOk();
         $this->api('POST', "visits/{$this->visit}/submit")->assertStatus(422);   // form requires answers; not the point here
+        \App\Models\Visit::query()->whereKey($this->visit)->update(['status' => 'rejected']);   // only one active visit per assignment is allowed
         $second = \App\Models\Visit::query()->create([
             'assignment_id' => $this->s->assignmentA->id, 'campaign_id' => $this->s->campaignA->id, 'agent_id' => $this->s->agent->id,
             'location_id' => $this->s->locationA->id, 'status' => 'started', 'visit_date' => now()->toDateString(),

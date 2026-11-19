@@ -39,6 +39,7 @@ class AuthTest extends DatabaseTestCase
 
     public function test_account_locks_after_repeated_failures_and_stays_locked_with_the_right_password(): void
     {
+        $this->withoutMiddleware(\Illuminate\Routing\Middleware\ThrottleRequests::class);   // the per-minute throttle is a separate protection
         $u = Scenario::user('Mgr', Role::CampaignManager);
         for ($i = 0; $i < config('field.auth.max_failed_logins'); $i++) {
             $this->login($u->email, 'wrong-password-'.$i);
@@ -65,6 +66,7 @@ class AuthTest extends DatabaseTestCase
         $this->withToken($token)->getJson('/api/v1/auth/me')->assertOk();
 
         $u->forceFill(['status' => 'disabled'])->save();
+        $this->app['auth']->forgetGuards();   // a real request starts with no remembered user; the test client reuses one app
         $this->withToken($token)->getJson('/api/v1/auth/me')->assertStatus(403);
     }
 

@@ -44,6 +44,7 @@ class ReplayTest extends DatabaseTestCase
 
     public function test_replaying_state_changing_calls_is_a_conflict_not_a_second_change(): void
     {
+        $this->s->locationA->update(['needs_review' => true]);   // these tests cover manual review; clean visits are approved automatically
         $v = $this->api('POST', 'visits', ['assignment_id' => $this->s->assignmentA->id])->json('data.id');
         $this->api('POST', "visits/$v/check-in", Scenario::gps())->assertOk();
         $this->api('POST', "visits/$v/check-in", Scenario::gps())->assertStatus(409);

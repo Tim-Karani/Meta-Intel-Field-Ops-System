@@ -1,0 +1,22 @@
+# Live server add-on. Used together with docker-compose.yml (the root .env sets COMPOSE_FILE so plain `docker compose ...` picks both).
+# Adds Caddy in front: it gets and renews the free HTTPS padlock by itself and passes traffic to nginx.
+# nginx is then reachable only from the server itself, so nobody can bypass the padlock.
+services:
+  web:
+    ports: !override ["127.0.0.1:8080:80"]
+
+  caddy:
+    image: caddy:2-alpine
+    depends_on: [web]
+    ports: ["80:80", "443:443"]
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN in the .env next to docker-compose.yml, e.g. metaintel.ourcompany.com}
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

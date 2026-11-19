@@ -2,6 +2,10 @@
 .env
 .env.*
 !.env.example
+!.env.server.example
+!.env.production.example
+backups/
+test-results.txt
 backend/vendor/
 backend/storage/logs/*
 backend/storage/app/private/*
@@ -17,3 +21,4 @@ node_modules/
 legacy/**/node_modules/
 mobile/**/build/
 mobile/**/.dart_tool/
+backend/.phpunit.cache/

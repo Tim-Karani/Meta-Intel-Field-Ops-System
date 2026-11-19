@@ -26,7 +26,7 @@ class TeamController extends ResourceController
             'name' => ['required', 'string', 'max:255'],
             'region' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:2000'],
-            'supervisor_id' => ['nullable', 'uuid', Rule::exists('users', 'id')->where('status', 'active')],
+            'supervisor_id' => ['nullable', 'bail', 'uuid', Rule::exists('users', 'id')->where('status', 'active')],
             'status' => ['in:active,inactive'],
             'members' => ['sometimes', 'array', 'max:500'],
             'members.*' => ['uuid', 'distinct', $agent],

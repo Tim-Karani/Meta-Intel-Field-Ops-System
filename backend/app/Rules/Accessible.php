@@ -24,7 +24,14 @@ class Accessible implements ValidationRule
             return;
         }
 
-        $query = AccessScope::scope((new $this->model)->newQuery(), $user)->whereKey($value);
+        // A malformed ID must fail validation, not reach PostgreSQL (which raises an error and turns a bad request into a 500).
+        $instance = new $this->model;
+        if (!$instance->getIncrementing() && !\Illuminate\Support\Str::isUuid($value)) {
+            $fail('The selected :attribute is invalid.');
+            return;
+        }
+
+        $query = AccessScope::scope($instance->newQuery(), $user)->whereKey($value);
         if ($this->extra) {
             ($this->extra)($query);
         }

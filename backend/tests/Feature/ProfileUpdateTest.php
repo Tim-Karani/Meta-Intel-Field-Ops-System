@@ -46,6 +46,6 @@ class ProfileUpdateTest extends DatabaseTestCase
         $fresh = $this->s->ops->fresh();
         $this->assertSame($roles, $fresh->roleSlugs());
         $this->assertSame($client, $fresh->client_id);
-        $this->assertNotSame('disabled', (string) $fresh->status);
+        $this->assertNotSame('disabled', $fresh->status->value);
     }
 }

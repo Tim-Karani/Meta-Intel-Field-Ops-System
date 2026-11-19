@@ -107,7 +107,7 @@ class AuthController extends ApiController
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', new UniqueEmail($user->getKey())],
-            'username' => ['nullable', 'string', 'max:60', 'alpha_dash', \Illuminate\Validation\Rule::unique('users', 'username')->ignore($user->getKey())],
+            'username' => ['nullable', 'string', 'max:60', 'regex:/^[A-Za-z0-9._-]+$/', \Illuminate\Validation\Rule::unique('users', 'username')->ignore($user->getKey())],
             'phone' => ['nullable', 'string', 'max:40'],
             'current_password' => ['nullable', 'string'],
         ]);

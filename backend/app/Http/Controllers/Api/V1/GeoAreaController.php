@@ -27,7 +27,7 @@ class GeoAreaController extends ResourceController
     {
         return [
             'level' => ['required', 'in:'.implode(',', self::LEVELS)],
-            'parent_id' => ['nullable', 'uuid', 'exists:geo_areas,id'],
+            'parent_id' => ['nullable', 'bail', 'uuid', 'exists:geo_areas,id'],
             'name' => ['required', 'string', 'max:120'],
             'code' => ['nullable', 'string', 'max:40'],
             'status' => ['in:active,inactive'],

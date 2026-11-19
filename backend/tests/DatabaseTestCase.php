@@ -14,8 +14,10 @@ abstract class DatabaseTestCase extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->seed(RolePermissionSeeder::class);
-        Storage::fake(config('field.uploads.disk'));
+        // Called directly, not via db:seed: that command silently refuses to run when APP_ENV is production.
+        (new RolePermissionSeeder())->run();
+        config(['field.uploads.disk' => 'evidence']);   // never a real bucket, whatever .env says
+        Storage::fake('evidence');
     }
 
     protected function api(string $method, string $uri, array $data = [], array $headers = []): \Illuminate\Testing\TestResponse

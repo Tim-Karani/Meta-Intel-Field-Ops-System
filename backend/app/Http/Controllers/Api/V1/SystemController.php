@@ -72,6 +72,7 @@ class SystemController extends ApiController
             'php' => PHP_VERSION,
             'laravel' => app()->version(),
             'debug' => (bool) config('app.debug'),
+            'mail' => (string) config('mail.default'),
             'time' => now()->toIso8601String(),
             'counts' => [
                 'users' => DB::table('users')->whereNull('deleted_at')->count(),
@@ -81,6 +82,29 @@ class SystemController extends ApiController
                 'audit_logs' => DB::table('audit_logs')->count(),
             ],
         ]);
+    }
+
+    /** Sends one test message so an administrator can prove that email delivery works (password resets, scheduled reports). */
+    public function testEmail(Request $request): JsonResponse
+    {
+        $data = $request->validate(['to' => ['nullable', 'email', 'max:255']]);
+        $to = $data['to'] ?? $request->user()->email;
+        $mailer = (string) config('mail.default');
+
+        if (in_array($mailer, ['log', 'array'], true)) {
+            return $this->ok(['sent' => false, 'mailer' => $mailer], "Email is set to '{$mailer}', so nothing is delivered to inboxes. Set MAIL_MAILER=smtp and the MAIL_ settings in backend/.env, then restart.");
+        }
+
+        try {
+            \Illuminate\Support\Facades\Mail::raw('This is a test email from MetaIntel. If you can read this, email sending works.', fn ($m) => $m->to($to)->subject('MetaIntel test email'));
+        } catch (\Throwable $e) {
+            report($e);
+
+            return ApiResponse::error('The email could not be sent. Check the MAIL_ settings in backend/.env and the server log.', 422, [], 'mail_failed');
+        }
+        AuditService::record('system.test_email', 'system', null, null, null, ['mailer' => $mailer]);
+
+        return $this->ok(['sent' => true, 'mailer' => $mailer, 'to' => $to], "Test email sent to {$to}.");
     }
 
     public function settings(): JsonResponse

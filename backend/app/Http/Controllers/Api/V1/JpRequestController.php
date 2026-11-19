@@ -86,7 +86,7 @@ class JpRequestController extends ApiController
         $user = $request->user();
         $d = $request->validate([
             'client_uuid' => ['nullable', 'uuid'], 'journey_plan_id' => ['required', 'uuid'], 'type' => ['required', Rule::in(['add', 'remove', 'move'])],
-            'location_id' => ['required', 'uuid', Rule::exists('locations', 'id')], 'weekday' => ['required', 'integer', 'between:1,7'], 'to_weekday' => ['nullable', 'integer', 'between:1,7'],
+            'location_id' => ['required', 'bail', 'uuid', Rule::exists('locations', 'id')], 'weekday' => ['required', 'integer', 'between:1,7'], 'to_weekday' => ['nullable', 'integer', 'between:1,7'],
             'reason' => ['required', 'string', 'min:5', 'max:1000'], 'latitude' => ['nullable', 'numeric', 'between:-90,90', 'required_with:longitude'], 'longitude' => ['nullable', 'numeric', 'between:-180,180', 'required_with:latitude'],
             'accuracy_m' => ['nullable', 'numeric', 'min:0'], 'photo' => ['nullable', 'image', 'max:8192'],
         ]);

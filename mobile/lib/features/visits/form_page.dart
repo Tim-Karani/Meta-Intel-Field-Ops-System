@@ -9,6 +9,7 @@ import '../../models/form_def.dart';
 import '../../models/local_visit.dart';
 import '../../state/providers.dart';
 import '../common/widgets.dart';
+import '../common/barcode_scan_page.dart';
 import 'photo_capture.dart';
 
 /// Renders the visit's form from the downloaded definition. Answers autosave to the phone as you type.
@@ -162,9 +163,10 @@ class _QuestionField extends ConsumerWidget {
 
   Widget _input(BuildContext context, WidgetRef ref) {
     switch (q.type) {
-      case 'short_text':
       case 'barcode':
-        return _TextInput(value: value?.toString() ?? '', enabled: enabled, onChanged: onChanged, hint: q.type == 'barcode' ? 'Type the barcode' : null);
+        return _BarcodeInput(value: value?.toString() ?? '', enabled: enabled, onChanged: onChanged);
+      case 'short_text':
+        return _TextInput(value: value?.toString() ?? '', enabled: enabled, onChanged: onChanged);
       case 'long_text':
         return _TextInput(value: value?.toString() ?? '', enabled: enabled, onChanged: onChanged, lines: 4);
       case 'integer':
@@ -341,6 +343,45 @@ class _TextInputState extends State<_TextInput> {
       );
 }
 
+/// A text box with a scan button: the agent can still type the code when the label is damaged.
+class _BarcodeInput extends StatefulWidget {
+  const _BarcodeInput({required this.value, required this.enabled, required this.onChanged});
+  final String value;
+  final bool enabled;
+  final void Function(String) onChanged;
+
+  @override
+  State<_BarcodeInput> createState() => _BarcodeInputState();
+}
+
+class _BarcodeInputState extends State<_BarcodeInput> {
+  late final TextEditingController _c = TextEditingController(text: widget.value);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  Future<void> _scan() async {
+    final code = await BarcodeScanPage.open(context);
+    if (code == null || !mounted) return;
+    _c.text = code;
+    widget.onChanged(code);
+  }
+
+  @override
+  Widget build(BuildContext context) => TextField(
+        controller: _c,
+        enabled: widget.enabled,
+        onChanged: widget.onChanged,
+        decoration: InputDecoration(
+          hintText: 'Scan or type the barcode',
+          suffixIcon: IconButton(icon: const Icon(Icons.qr_code_scanner), tooltip: 'Scan', onPressed: widget.enabled ? _scan : null),
+        ),
+      );
+}
+
 class _ProductPicker extends ConsumerWidget {
   const _ProductPicker({required this.campaignId, required this.value, required this.enabled, required this.onChanged});
   final String? campaignId;
@@ -352,12 +393,28 @@ class _ProductPicker extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final products = ref.watch(productsProvider(campaignId)).valueOrNull ?? const <Map<String, dynamic>>[];
     final ids = products.map((p) => p['id'].toString()).toSet();
-    return DropdownButtonFormField<String>(
-      value: value != null && ids.contains(value) ? value : null,
-      isExpanded: true,
-      items: [for (final p in products) DropdownMenuItem(value: p['id'].toString(), child: Text('${p['name']}', overflow: TextOverflow.ellipsis))],
-      onChanged: enabled ? (x) => onChanged(x) : null,
-      decoration: const InputDecoration(hintText: 'Select a product'),
-    );
+    Future<void> scan() async {
+      final code = await BarcodeScanPage.open(context, title: 'Scan product');
+      if (code == null || !context.mounted) return;
+      final hit = products.where((p) => (p['sku'] ?? '').toString().trim().toLowerCase() == code.toLowerCase()).toList();
+      if (hit.isEmpty) {
+        toast(context, 'No product on this project has the code $code.', error: true);
+      } else {
+        onChanged(hit.first['id'].toString());
+      }
+    }
+
+    return Row(children: [
+      Expanded(
+        child: DropdownButtonFormField<String>(
+          value: value != null && ids.contains(value) ? value : null,
+          isExpanded: true,
+          items: [for (final p in products) DropdownMenuItem(value: p['id'].toString(), child: Text('${p['name']}', overflow: TextOverflow.ellipsis))],
+          onChanged: enabled ? (x) => onChanged(x) : null,
+          decoration: const InputDecoration(hintText: 'Select a product'),
+        ),
+      ),
+      IconButton(icon: const Icon(Icons.qr_code_scanner), tooltip: 'Scan product', onPressed: enabled ? scan : null),
+    ]);
   }
 }

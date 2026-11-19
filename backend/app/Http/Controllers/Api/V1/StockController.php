@@ -92,8 +92,8 @@ class StockController extends ApiController
     {
         $d = $request->validate([
             'campaign_id' => ['required', 'uuid', new Accessible(Campaign::class)],
-            'agent_id' => ['required', 'uuid', 'exists:users,id'],
-            'product_id' => ['required', 'uuid', 'exists:products,id'],
+            'agent_id' => ['required', 'bail', 'uuid', 'exists:users,id'],
+            'product_id' => ['required', 'bail', 'uuid', 'exists:products,id'],
             'kind' => ['required', Rule::in(['issue', 'return', 'adjust'])],
             'quantity' => ['required', 'integer', 'between:-100000,100000', 'not_in:0'],
             'note' => ['nullable', 'string', 'max:255'],

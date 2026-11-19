@@ -77,6 +77,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('permission:system.manage')->group(function () {
             Route::get('security-events', [V1\AuditLogController::class, 'securityEvents']);
             Route::get('system/health', [V1\SystemController::class, 'details']);
+            Route::post('system/test-email', [V1\SystemController::class, 'testEmail'])->middleware('throttle:6,1');
             Route::get('system/settings', [V1\SystemController::class, 'settings']);
             Route::put('system/settings', [V1\SystemController::class, 'updateSettings']);
             Route::get('system/gps-rules', [V1\SystemController::class, 'gpsRules']);

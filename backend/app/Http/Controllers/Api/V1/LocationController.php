@@ -127,8 +127,8 @@ class LocationController extends ResourceController
             'changes' => ['required', 'array'],
             'changes.channel_id' => ['nullable', 'uuid', new Accessible(\App\Models\Channel::class)],
             'changes.type' => ['string', Rule::exists('outlet_types', 'slug')],
-            'changes.outlet_subtype_id' => ['nullable', 'uuid', Rule::exists('outlet_subtypes', 'id')],
-            'changes.outlet_status_id' => ['uuid', Rule::exists('outlet_statuses', 'id')],
+            'changes.outlet_subtype_id' => ['nullable', 'bail', 'uuid', Rule::exists('outlet_subtypes', 'id')],
+            'changes.outlet_status_id' => ['bail', 'uuid', Rule::exists('outlet_statuses', 'id')],
             'changes.distributor_id' => ['nullable', 'uuid', new Accessible(\App\Models\Distributor::class)],
             'changes.geo_area_id' => ['nullable', 'uuid', new Accessible(\App\Models\GeoArea::class)],
             'changes.territory_id' => ['nullable', 'uuid', new Accessible(\App\Models\Territory::class)],
@@ -446,12 +446,12 @@ class LocationController extends ResourceController
             'name' => ['required', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:40', Rule::unique('locations', 'code')->ignore($model?->getKey())],
             'type' => ['string', Rule::exists('outlet_types', 'slug')],
-            'outlet_subtype_id' => ['nullable', 'uuid', Rule::exists('outlet_subtypes', 'id'), function ($attr, $value, $fail) use ($model) {
+            'outlet_subtype_id' => ['nullable', 'bail', 'uuid', Rule::exists('outlet_subtypes', 'id'), function ($attr, $value, $fail) use ($model) {
                 $type = request()->input('type', $model?->type);
                 $ok = $value === null || \App\Models\OutletSubtype::query()->whereKey($value)->whereHas('type', fn ($q) => $q->where('slug', $type))->exists();
                 $ok || $fail('That sub-type belongs to a different outlet type.');
             }],
-            'outlet_status_id' => ['nullable', 'uuid', Rule::exists('outlet_statuses', 'id')],
+            'outlet_status_id' => ['nullable', 'bail', 'uuid', Rule::exists('outlet_statuses', 'id')],
             'distributor_id' => ['nullable', 'uuid', new Accessible(\App\Models\Distributor::class)],
             'geo_area_id' => ['nullable', 'uuid', new Accessible(\App\Models\GeoArea::class)],
             'phone' => ['nullable', 'string', 'max:40'],

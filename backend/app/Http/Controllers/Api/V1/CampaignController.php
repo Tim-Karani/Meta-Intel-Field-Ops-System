@@ -38,7 +38,7 @@ class CampaignController extends ResourceController
             'budget' => ['nullable', 'numeric', 'min:0', 'max:9999999999'],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date', 'after_or_equal:start_date'],
-            'template_id' => ['nullable', 'uuid', Rule::exists('project_templates', 'id')],
+            'template_id' => ['nullable', 'bail', 'uuid', Rule::exists('project_templates', 'id')],
         ] + ProjectTemplateController::settingsRules();
     }
 

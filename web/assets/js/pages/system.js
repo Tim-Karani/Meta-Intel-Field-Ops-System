@@ -2,10 +2,26 @@ import { h } from '../core/dom.js';
 import { icon } from '../core/icons.js';
 import { api } from '../core/api.js';
 import { fmtDateTime, fmtNumber, titleCase } from '../core/format.js';
-import { asyncView, badge, card, pageHead, stat } from '../ui/feedback.js';
+import { asyncView, badge, card, pageHead, stat, toast, toastError } from '../ui/feedback.js';
 import { simpleTable } from '../ui/table.js';
 
 const LABEL = { database: 'Database', migrations: 'Migrations', evidence_storage: 'Evidence storage', queue: 'Queue', scheduler: 'Scheduler' };
+
+function testEmailCard(mail) {
+  const to = h('input', { class: 'input', type: 'email', placeholder: 'Your email (leave empty to use the one on your profile)', 'aria-label': 'Send the test email to' });
+  const btn = h('button', { class: 'btn primary', type: 'button' }, 'Send test email');
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    try {
+      const r = await api.post('system/test-email', to.value.trim() ? { to: to.value.trim() } : {});
+      toast(r.message || 'Done.', r.data?.sent ? 'ok' : 'warn', 8000);
+    } catch (e) { toastError(e); } finally { btn.disabled = false; }
+  });
+  return card('Email', h('div', { class: 'stack' },
+    (mail === 'log' || mail === 'array') && h('div', { class: 'alert warn' }, icon('alert'), h('div', null, h('strong', null, 'Email is not set up.'), ' Password resets and scheduled reports are only written to the server log. Set MAIL_MAILER=smtp and the MAIL_ settings in backend/.env (see docs/EMAIL_SETUP.md).')),
+    h('div', { class: 'small' }, `Current mail setting: ${mail}`),
+    h('div', { class: 'row' }, to, btn)));
+}
 
 export default async function render({ container }) {
   const host = h('div');
@@ -18,5 +34,6 @@ export default async function render({ container }) {
       { label: 'Detail', render: (r) => r.detail }, { label: 'Time', align: 'right', render: (r) => `${r.ms} ms` },
     ], Object.entries(d.checks).map(([name, c]) => ({ name, ...c }))), { flush: true }),
     h('div', { class: 'grid cols-4' }, Object.entries(d.counts).map(([k, v]) => stat({ label: titleCase(k), value: fmtNumber(v), icon: 'layers' }))),
+    testEmailCard(d.mail),
     card('Runtime', h('dl', { class: 'kv' }, [['Environment', d.environment], ['PHP', d.php], ['Laravel', d.laravel]].flatMap(([k, v]) => [h('dt', null, k), h('dd', null, v)])))));
 }

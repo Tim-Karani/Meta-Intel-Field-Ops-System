@@ -41,7 +41,7 @@ class JourneyPlanController extends ResourceController
     {
         return [
             'campaign_id' => ['required', 'uuid', new Accessible(Campaign::class)],
-            'agent_id' => ['required', 'uuid', Rule::exists('users', 'id')],
+            'agent_id' => ['required', 'bail', 'uuid', Rule::exists('users', 'id')],
             'name' => ['nullable', 'string', 'max:160'],
             'starts_on' => ['nullable', 'date'],
             'ends_on' => ['nullable', 'date', 'after_or_equal:starts_on'],
