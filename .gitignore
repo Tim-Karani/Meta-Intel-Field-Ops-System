@@ -22,3 +22,4 @@ legacy/**/node_modules/
 mobile/**/build/
 mobile/**/.dart_tool/
 backend/.phpunit.cache/
+diag-results.txt
