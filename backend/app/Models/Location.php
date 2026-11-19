@@ -53,6 +53,27 @@ class Location extends Model
         'created_via',
     ];
 
+    /** The person who last changed the outlet. Set here so every route into the outlet (office, phone, check-in) is covered. */
+    protected static function booted(): void
+    {
+        static::saving(function (self $m) {
+            $id = \Illuminate\Support\Facades\Auth::id();
+            if ($id && $m->isDirty() && !$m->isDirty('updated_by')) {
+                $m->updated_by = $id;
+            }
+        });
+    }
+
+    public function updater(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
     protected function casts(): array
     {
         return [

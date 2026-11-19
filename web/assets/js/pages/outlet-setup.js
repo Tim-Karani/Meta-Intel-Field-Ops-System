@@ -3,6 +3,8 @@ import { crudPage } from '../ui/crud.js';
 import { badge, tabs, pageHead } from '../ui/feedback.js';
 import { api } from '../core/api.js';
 import { href } from '../core/router.js';
+import { outletsPanel } from './locations.js';
+import { toastError } from '../ui/feedback.js';
 
 /* Outlet setup: the lists the office keeps tidy once, and every outlet form, import and report then uses them. */
 
@@ -106,6 +108,6 @@ export default async function render({ container }) {
     });
   };
 
-  container.append(pageHead({ title: 'Outlet setup', subtitle: 'The lists behind your outlets: chains, types, statuses, distributors and places.', actions: h('a', { class: 'btn', href: href('/locations') }, 'Back to outlets') }),
-    tabs([{ key: 'chains', label: 'Chains', render: chains }, { key: 'types', label: 'Types & sub-types', render: typesTab }, { key: 'statuses', label: 'Statuses', render: statuses }, { key: 'distributors', label: 'Distributors', render: distributors }, { key: 'geo', label: 'Geography', render: geography }]));
+  container.append(pageHead({ title: 'Outlet setup', subtitle: 'Your outlets and the lists behind them: chains, types, statuses, distributors and places. Everything here can be edited.', actions: h('a', { class: 'btn', href: href('/locations') }, 'Back to outlets') }),
+    tabs([{ key: 'outlets', label: 'Outlets', render: () => { const host = h('div'); outletsPanel({}).then((p) => host.append(p)).catch(toastError); return host; } }, { key: 'chains', label: 'Chains', render: chains }, { key: 'types', label: 'Types & sub-types', render: typesTab }, { key: 'statuses', label: 'Statuses', render: statuses }, { key: 'distributors', label: 'Distributors', render: distributors }, { key: 'geo', label: 'Geography', render: geography }]));
 }

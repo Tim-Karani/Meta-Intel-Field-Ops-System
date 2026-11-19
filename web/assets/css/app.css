@@ -121,12 +121,12 @@ table.data tbody tr:hover { background:var(--surface-2); } table.data tr.clickab
 .tabs { display:flex; gap:2px; border-bottom:1px solid var(--border); margin-bottom:18px; overflow-x:auto; } .tabs button { border:0; background:none; padding:10px 14px; cursor:pointer; color:var(--text-3); font-weight:500; border-bottom:2px solid transparent; white-space:nowrap; margin-bottom:-1px; } .tabs button:hover { color:var(--text); } .tabs button[aria-selected="true"] { color:var(--accent-700); border-bottom-color:var(--accent-500); }
 
 /* modal / drawer */
-.overlay { position:fixed; inset:0; background:rgba(10,18,34,.5); z-index:100; display:grid; place-items:center; padding:16px; animation:fade .12s ease-out; }
-.overlay.right { place-items:stretch end; padding:0; }
+.overlay { position:fixed; inset:0; background:rgba(10,18,34,.5); z-index:100; display:grid; place-items:center; padding:16px; grid-template-rows:minmax(0,1fr); animation:fade .12s ease-out; }
+.overlay.right { place-items:stretch end; padding:0; grid-template-rows:minmax(0,1fr); grid-template-columns:minmax(0,1fr); }
 .modal { background:var(--surface); border-radius:14px; box-shadow:var(--shadow-lg); width:min(640px,100%); max-height:calc(100vh - 32px); display:flex; flex-direction:column; } .modal.lg { width:min(920px,100%); } .modal.sm { width:min(440px,100%); }
-.overlay.right .modal { border-radius:0; height:100%; max-height:none; width:min(560px,100%); }
+.overlay.right .modal { border-radius:0; height:100%; max-height:100%; min-height:0; width:min(560px,100%); justify-self:end; }
 .modal-head { display:flex; align-items:center; gap:10px; padding:16px 20px; border-bottom:1px solid var(--border); } .modal-head h2 { flex:1; }
-.modal-body { padding:20px; overflow:auto; } .modal-foot { padding:14px 20px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px; background:var(--surface-2); border-radius:0 0 14px 14px; }
+.modal-body { padding:20px; overflow:auto; flex:1 1 auto; min-height:0; } .modal-head, .modal-foot { flex:none; } .modal-foot { padding:14px 20px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:8px; background:var(--surface-2); border-radius:0 0 14px 14px; }
 @keyframes fade { from { opacity:0; } }
 
 /* toasts */

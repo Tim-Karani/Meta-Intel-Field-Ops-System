@@ -60,7 +60,7 @@ export async function openOutletForm({ location = null, defaults = {}, onSaved, 
   const at = (level) => chain.find((a) => a.level === level)?.id || '';
 
   /* ---- map ---- */
-  const pane = geoPane({ lat: v.latitude != null ? Number(v.latitude) : undefined, lng: v.longitude != null ? Number(v.longitude) : undefined, searchText: [v.name, v.town].filter(Boolean).join(' '), height: 300,
+  const pane = geoPane({ lat: v.latitude != null ? Number(v.latitude) : undefined, lng: v.longitude != null ? Number(v.longitude) : undefined, searchText: [v.name, v.town].filter(Boolean).join(' '), height: 260,
     onChange: (pos, place) => { if (place && !about.read().name && place.name) about.set('name', place.name); if (place && !where.read().address && place.address) where.set('address', place.address); } });
 
   /* ---- sections ---- */
@@ -123,10 +123,10 @@ export async function openOutletForm({ location = null, defaults = {}, onSaved, 
   const saveBtn = h('button', { class: 'btn primary', type: 'button' }, editing || (draft && location) ? 'Save changes' : draft ? 'Add to list' : 'Save outlet');
 
   const body = h('div', { class: 'stack op-panel' }, banner,
-    section(1, 'Find it on the map', 'Search the shop by name, click the map, or paste coordinates.', pane.el),
-    section(2, 'About the outlet', null, about.el),
+    section(1, 'About the outlet', 'Name, code, chain and type.', about.el),
+    section(2, 'Status, phone and distributor', null, trade.el),
     section(3, 'Where it is', 'Pick from the geography list so reports roll up correctly.', where.el),
-    section(4, 'Contact and trade', null, trade.el));
+    section(4, 'Find it on the map', 'Search the shop by name, click the map, or paste coordinates.', pane.el));
 
   const forms = [about, where, trade];
   const modal = openModal({

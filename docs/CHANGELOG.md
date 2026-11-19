@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.0 - Outlets show who last edited them
+- Outlet list now follows the office layout: ID, Name, Type, Status, Geo, Phone no., Channel, Distributor, Last edited by.
+- New: an outlet remembers the last person who changed it (migration 000016). Who created it is kept; the outlet page shows both.
+- New: "Change history" tab on an outlet (people with audit access): who changed what, with before and after values, from the audit log.
+
 ## 1.11.2 - Test suite green-up and three real fixes
 - Fixed: a malformed ID (for example `not-a-uuid`) in a form field made the server answer 500; it now answers 422 with a normal validation message (Accessible rule and the `exists` rules).
 - Fixed: saving a conditional answer on its own (for example "Why not?") lost it, because the controlling answer was not in the same request. Saved answers are now taken into account.

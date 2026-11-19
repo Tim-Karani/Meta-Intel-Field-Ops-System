@@ -30,8 +30,16 @@ export default async function render({ container, params }) {
       tabs([
         { key: 'overview', label: 'Overview', render: () => h('div', { class: 'grid cols-2' },
           card('Details', kv([['Code', loc.code && h('span', { class: 'mono' }, loc.code)], ['Chain', loc.channel?.name], ['Channel group', loc.channel?.channel_group], ['Sub-type', loc.outlet_subtype?.name], ['Setting', loc.setting && titleCase(loc.setting)], ['Mall / market', loc.market_name], ['Shop no.', loc.shop_no], ['Client', loc.client?.name], ['Territory', loc.territory?.name], ['Region', loc.region], ['Locality', loc.locality], ['Area', loc.town], ['Distributor', loc.distributor?.name], ['Shop phone / email', [loc.phone, loc.email].filter(Boolean).join(' · ') || null], ['Address', loc.address], ['Opening hours', loc.opening_hours],
-            ['Contact', [loc.contact_name, loc.contact_phone].filter(Boolean).join(' · ') || null], ['Geofence', `${loc.geofence_radius_m ?? 100} m`], ['Coordinates', mapped ? h('a', { href: osmLink(lat, lng), target: '_blank', rel: 'noopener noreferrer' }, `${lat.toFixed(5)}, ${lng.toFixed(5)}`) : 'Not mapped yet'], ['Position source', mapped ? geoSource(loc.geo_source) : null], ['Added', loc.created_via === 'field' ? 'In the field by an agent' : null], ['Notes', loc.notes]])),
+            ['Contact', [loc.contact_name, loc.contact_phone].filter(Boolean).join(' · ') || null], ['Created by', loc.creator?.name], ['Last edited by', loc.updater?.name && `${loc.updater.name} · ${fmtDateTime(loc.updated_at)}`], ['Geofence', `${loc.geofence_radius_m ?? 100} m`], ['Coordinates', mapped ? h('a', { href: osmLink(lat, lng), target: '_blank', rel: 'noopener noreferrer' }, `${lat.toFixed(5)}, ${lng.toFixed(5)}`) : 'Not mapped yet'], ['Position source', mapped ? geoSource(loc.geo_source) : null], ['Added', loc.created_via === 'field' ? 'In the field by an agent' : null], ['Notes', loc.notes]])),
           card('Position', mapped ? mapView({ markers: [{ lat, lng, label: loc.name, radiusM: loc.geofence_radius_m }], height: 300, interactive: true }) : h('p', { class: 'muted' }, 'No map pin yet — it appears after the first check-in at this outlet.'))) },
+        can('audit.view') && { key: 'changes', label: 'Change history', render: () => dataTable({
+          endpoint: 'audit-logs', query: { subject_id: loc.id }, defaultSort: null, search: false, emptyTitle: 'No changes recorded for this outlet',
+          columns: [
+            { key: 'created_at', label: 'When', render: (r) => fmtDateTime(r.created_at) },
+            { key: 'actor', label: 'Who', render: (r) => r.actor?.name || h('span', { class: 'muted' }, 'System') },
+            { key: 'action', label: 'Action', render: (r) => titleCase(r.action) },
+            { key: 'what', label: 'What changed', render: (r) => { const keys = Object.keys(r.after || {}).filter((k) => !['updated_by', 'geo_captured_at'].includes(k)); return keys.length ? h('div', { class: 'small' }, keys.map((k) => h('div', null, h('strong', null, titleCase(k)), `: ${r.before?.[k] ?? '—'} → ${r.after[k] ?? '—'}`))) : '—'; } },
+          ] }) },
         { key: 'visits', label: 'Visit history', render: () => dataTable({
           endpoint: 'visits', query: { location_id: loc.id }, defaultSort: '-visit_date', search: false, emptyTitle: 'No visits at this location yet',
           columns: [
@@ -50,6 +58,6 @@ export default async function render({ container, params }) {
             { key: 'campaign', label: 'Campaign', render: (r) => (r.campaign ? h('a', { href: href(`/campaigns/${r.campaign.id}`) }, r.campaign.name) : '—') },
             { key: 'status', label: 'Status', render: (r) => badge(r.status) },
           ] }) },
-      ]), h('p', { class: 'small muted', style: { marginTop: '12px' } }, `Created ${fmtDateTime(loc.created_at)}`));
+      ].filter(Boolean)), h('p', { class: 'small muted', style: { marginTop: '12px' } }, `Created ${fmtDateTime(loc.created_at)}`));
   });
 }

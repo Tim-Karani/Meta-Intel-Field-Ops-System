@@ -7,7 +7,7 @@ import { lookup, invalidateLookups } from '../core/lookups.js';
 import { icon } from '../core/icons.js';
 import { api } from '../core/api.js';
 import { href, navigate } from '../core/router.js';
-import { titleCase } from '../core/format.js';
+import { titleCase, fmtDateTime } from '../core/format.js';
 import { mapView } from '../ui/map.js';
 import { openLocationImport } from '../ui/location-import.js';
 import { can } from '../core/auth.js';
@@ -18,6 +18,17 @@ export const geoSource = (src) => SOURCE[src] || '—';
 export const positionBadge = (r) => (r.latitude == null ? badge('not mapped', { tone: 'warn' }) : r.needs_review ? badge('confirm position', { tone: 'info' }) : badge('mapped', { tone: 'ok' }));
 
 export default async function render({ container, query: urlQuery }) {
+  return mount(container, urlQuery, false);
+}
+
+/** The same outlet table, embedded in another page (Outlet setup): add, edit, delete and bulk-change from there. */
+export async function outletsPanel(query) {
+  const box = h('div');
+  await mount(box, query, true);
+  return box;
+}
+
+async function mount(container, urlQuery, embedded) {
   const opt = (rows) => rows.map((r) => ({ value: r.id, label: r.name }));
   const [territories, channels, typeRows, statusRows, distributors] = await Promise.all([
     lookup('territories').catch(() => []), lookup('channels').catch(() => []),
@@ -57,13 +68,15 @@ export default async function render({ container, query: urlQuery }) {
         { key: 'distributor_id', label: 'All distributors', options: distributors }, { key: 'territory_id', label: 'All territories', options: territories },
       ],
       columns: [
-        { key: 'name', label: 'Outlet', sort: 'name', render: (r) => h('div', null, h('a', { href: href(`/locations/${r.id}`) }, h('strong', null, r.name)), h('div', { class: 'small muted' }, [r.code, r.shop_no && `Shop ${r.shop_no}`, r.market_name].filter(Boolean).join(' · '))) },
-        { key: 'channel', label: 'Chain', render: (r) => r.channel?.name || h('span', { class: 'muted' }, 'Independent') },
+        { key: 'code', label: 'ID', render: (r) => (r.code ? h('span', { class: 'mono small' }, r.code) : h('span', { class: 'muted' }, '—')) },
+        { key: 'name', label: 'Name', sort: 'name', render: (r) => h('div', null, h('a', { href: href(`/locations/${r.id}`) }, h('strong', null, r.name)), h('div', { class: 'small muted' }, [r.shop_no && `Shop ${r.shop_no}`, r.market_name, where(r)].filter((x) => x && x !== '—').join(' · '))) },
         { key: 'type', label: 'Type', render: (r) => h('div', null, typeName[r.type] || titleCase(r.type), r.outlet_subtype && h('div', { class: 'small muted' }, r.outlet_subtype.name)) },
-        { key: 'where', label: 'Where', sort: 'town', render: (r) => where(r) },
-        { key: 'distributor', label: 'Distributor', render: (r) => r.distributor?.name || '—' },
-        { key: 'position', label: 'Pin', render: (r) => positionBadge(r) },
         { key: 'status', label: 'Status', render: (r) => badge(r.outlet_status?.name || r.status, { tone: r.outlet_status?.tone === 'neutral' ? undefined : r.outlet_status?.tone }) },
+        { key: 'position', label: 'Geo', render: (r) => positionBadge(r) },
+        { key: 'phone', label: 'Phone no.', render: (r) => r.phone || r.contact_phone || h('span', { class: 'muted' }, '—') },
+        { key: 'channel', label: 'Channel', render: (r) => r.channel?.name || h('span', { class: 'muted' }, 'Independent') },
+        { key: 'distributor', label: 'Distributor', render: (r) => r.distributor?.name || '—' },
+        { key: 'edited', label: 'Last edited by', render: (r) => { const who = r.updater?.name || r.creator?.name; return who ? h('div', null, who, h('div', { class: 'small muted' }, fmtDateTime(r.updated_at))) : h('span', { class: 'muted' }, '—'); } },
         { key: '_a', label: '', align: 'right', class: 'nowrap', render: (r) => canManage && h('div', { class: 'row', style: { justifyContent: 'flex-end' } },
           h('button', { class: 'btn sm ghost', type: 'button', title: 'Edit', 'aria-label': `Edit ${r.name}`, onclick: () => openOutletForm({ location: r, onSaved: refresh }) }, icon('edit', { size: 15 })),
           h('button', { class: 'btn sm ghost', type: 'button', title: 'Delete', 'aria-label': `Delete ${r.name}`, onclick: () => remove(r) }, icon('trash', { size: 15 }))) },
@@ -109,6 +122,10 @@ export default async function render({ container, query: urlQuery }) {
     canManage && h('button', { class: 'btn', type: 'button', onclick: () => openQuickCreate({ onDone: refresh }) }, 'Quick create'),
     canManage && h('button', { class: 'btn primary', type: 'button', onclick: () => openOutletForm({ onSaved: refresh }) }, icon('plus', { size: 16 }), 'New outlet'),
   ];
+  if (embedded) {
+    container.append(h('div', { class: 'row', style: { justifyContent: 'flex-end', marginBottom: '12px', gap: '8px', flexWrap: 'wrap' } }, ...actions.slice(1)), list());
+    return;
+  }
   container.append(...[pageHead({ title: 'Outlets', subtitle: 'Every shop and site your teams visit, grouped by chain, type and place.', actions }),
     presetName ? h('div', { class: 'alert info' }, h('div', null, `Showing outlets for ${presetName}. `, h('a', { href: href('/locations') }, 'Show all outlets'))) : null,
     tabs([{ key: 'list', label: 'Outlets', render: list }, { key: 'overview', label: 'Overview', render: overview }, { key: 'map', label: 'Map', render: mapTab }])].filter(Boolean));

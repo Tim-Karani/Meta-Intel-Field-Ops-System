@@ -18,7 +18,7 @@ use Illuminate\Validation\Rule;
 class LocationController extends ResourceController
 {
     protected string $model = Location::class;
-    protected array $with = ['territory:id,name', 'client:id,name', 'channel:id,name,channel_group', 'outletSubtype:id,name,outlet_type_id', 'outletStatus:id,name,tone,counts_as_active', 'distributor:id,name', 'geoArea:id,name,level,parent_id'];
+    protected array $with = ['territory:id,name', 'client:id,name', 'channel:id,name,channel_group', 'outletSubtype:id,name,outlet_type_id', 'outletStatus:id,name,tone,counts_as_active', 'distributor:id,name', 'geoArea:id,name,level,parent_id', 'updater:id,name', 'creator:id,name'];
     protected array $search = ['name', 'code', 'town', 'county', 'address', 'region', 'locality', 'phone', 'shop_no', 'market_name'];
     protected array $filters = ['territory_id' => 'territory_id', 'status' => 'status', 'county' => 'county', 'type' => 'type', 'channel_id' => 'channel_id', 'region' => 'region', 'outlet_subtype_id' => 'outlet_subtype_id', 'outlet_status_id' => 'outlet_status_id', 'distributor_id' => 'distributor_id', 'setting' => 'setting'];
     protected array $sortable = ['name', 'town', 'created_at'];
