@@ -37,8 +37,8 @@ class ProductController extends ResourceController
 
     protected function deleting(Model $model): void
     {
-        if (DB::table('sales_items')->where('product_id', $model->getKey())->exists() || DB::table('osa_records')->where('product_id', $model->getKey())->exists()) {
-            throw DomainRuleException::conflict('This product has recorded sales or OSA data. Mark it inactive instead.', 'product_in_use');
+        if (collect(['sales_items', 'osa_records', 'order_items', 'expiry_records', 'stock_counts'])->contains(fn ($t) => DB::table($t)->where('product_id', $model->getKey())->exists())) {
+            throw DomainRuleException::conflict('This product has recorded sales, orders, stock or OSA data. Mark it inactive instead.', 'product_in_use');
         }
     }
 }

@@ -32,6 +32,9 @@ class ReportService
         'visit_completion' => 'Visit completion',
         'sales' => 'Sales',
         'osa' => 'On-shelf availability',
+        'orders' => 'Orders',
+        'expiries' => 'Expiries',
+        'stock_count' => 'Stock count',
         'merchandising' => 'Merchandising compliance',
         'location_performance' => 'Location performance',
         'issue_management' => 'Issue management',
@@ -302,6 +305,58 @@ class ReportService
             $this->col('dimension', $label, $label === 'Date' ? 'date' : 'text'), $this->col('units', 'Units'), $this->col('value', 'Value', 'money'),
             $this->col('transactions', 'Transactions'), $this->col('promo_units', 'Promo units'),
         ], $rows, ['units' => array_sum(array_column($rows, 'units')), 'value' => round(array_sum(array_column($rows, 'value')), 2)]];
+    }
+
+    /** Orders: one row per product line with quantity and value (detail, newest first). */
+    private function reportOrders(User $u, array $f, bool $approved): array
+    {
+        $rows = $this->visitBase($u, $f, $approved)->join('orders as o', 'o.visit_id', '=', 'v.id')->join('order_items as oi', 'oi.order_id', '=', 'o.id')
+            ->join('products as p', 'p.id', '=', 'oi.product_id')->orderByDesc('o.captured_at')->limit(5000)
+            ->selectRaw('v.visit_date as date, l.name as location, ag.name as agent, c.name as campaign, p.name as product, oi.quantity, oi.unit_price, oi.line_total as value')
+            ->get()->map(fn ($r) => [
+                'date' => $r->date, 'location' => $r->location, 'agent' => $r->agent, 'campaign' => $r->campaign, 'product' => $r->product,
+                'quantity' => (int) $r->quantity, 'unit_price' => round((float) $r->unit_price, 2), 'value' => round((float) $r->value, 2),
+            ])->all();
+
+        return [[
+            $this->col('date', 'Date', 'date'), $this->col('location', 'Outlet', 'text'), $this->col('agent', 'Agent', 'text'), $this->col('campaign', 'Project', 'text'),
+            $this->col('product', 'Product', 'text'), $this->col('quantity', 'Quantity'), $this->col('unit_price', 'Unit price', 'money'), $this->col('value', 'Value', 'money'),
+        ], $rows, ['quantity' => array_sum(array_column($rows, 'quantity')), 'value' => round(array_sum(array_column($rows, 'value')), 2)]];
+    }
+
+    /** Expiries: stock that expires, by outlet and product, soonest first. */
+    private function reportExpiries(User $u, array $f, bool $approved): array
+    {
+        $rows = $this->visitBase($u, $f, $approved)->join('expiry_records as e', 'e.visit_id', '=', 'v.id')->join('products as p', 'p.id', '=', 'e.product_id')
+            ->orderBy('e.expiry_date')->limit(5000)
+            ->selectRaw('e.captured_at as captured, l.name as location, ag.name as agent, c.name as campaign, p.name as product, e.batch_no, e.expiry_date, e.quantity')
+            ->get()->map(fn ($r) => [
+                'captured' => substr((string) $r->captured, 0, 10), 'location' => $r->location, 'agent' => $r->agent, 'campaign' => $r->campaign, 'product' => $r->product,
+                'batch_no' => $r->batch_no, 'expiry_date' => $r->expiry_date, 'quantity' => (int) $r->quantity,
+                'days_left' => (int) floor((strtotime((string) $r->expiry_date) - strtotime(date('Y-m-d'))) / 86400),
+            ])->all();
+
+        return [[
+            $this->col('captured', 'Captured on', 'date'), $this->col('location', 'Outlet', 'text'), $this->col('agent', 'Agent', 'text'), $this->col('campaign', 'Project', 'text'),
+            $this->col('product', 'Product', 'text'), $this->col('batch_no', 'Batch', 'text'), $this->col('expiry_date', 'Expiry date', 'date'), $this->col('quantity', 'Quantity'), $this->col('days_left', 'Days left'),
+        ], $rows, ['quantity' => array_sum(array_column($rows, 'quantity')), 'expired' => count(array_filter($rows, fn ($r) => $r['days_left'] < 0))]];
+    }
+
+    /** Stock count: shelf and back room per outlet and product. */
+    private function reportStockCount(User $u, array $f, bool $approved): array
+    {
+        $rows = $this->visitBase($u, $f, $approved)->join('stock_counts as s', 's.visit_id', '=', 'v.id')->join('products as p', 'p.id', '=', 's.product_id')
+            ->orderByDesc('s.captured_at')->limit(5000)
+            ->selectRaw('v.visit_date as date, l.name as location, ag.name as agent, c.name as campaign, p.name as product, s.shelf_quantity as shelf, s.backroom_quantity as backroom')
+            ->get()->map(fn ($r) => [
+                'date' => $r->date, 'location' => $r->location, 'agent' => $r->agent, 'campaign' => $r->campaign, 'product' => $r->product,
+                'shelf' => (int) $r->shelf, 'backroom' => (int) $r->backroom, 'total' => (int) $r->shelf + (int) $r->backroom,
+            ])->all();
+
+        return [[
+            $this->col('date', 'Date', 'date'), $this->col('location', 'Outlet', 'text'), $this->col('agent', 'Agent', 'text'), $this->col('campaign', 'Project', 'text'),
+            $this->col('product', 'Product', 'text'), $this->col('shelf', 'Shelf'), $this->col('backroom', 'Back room'), $this->col('total', 'Total'),
+        ], $rows, ['shelf' => array_sum(array_column($rows, 'shelf')), 'backroom' => array_sum(array_column($rows, 'backroom')), 'total' => array_sum(array_column($rows, 'total'))]];
     }
 
     private function reportOsa(User $u, array $f, bool $approved): array

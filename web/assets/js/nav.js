@@ -28,7 +28,10 @@ export const HUBS = {
     ] },
     { title: 'Captured data', items: [
       T('Sales', 'dollar', '/sales', ['sales.view'], 'Units and value sold, per outlet and product.', { feature: 'sales' }),
-      T('Stock', 'box', '/stock', ['stock.view'], 'Stock counts per outlet and product.', { feature: 'sales' }),
+      T('Orders', 'dollar', '/orders', ['sales.view'], 'Orders taken at outlets: quantity and value.'),
+      T('Expiries', 'clock', '/expiries', ['stock.view'], 'Stock that expires, with expiry date and quantity.'),
+      T('Stock count', 'box', '/stock-counts', ['stock.view'], 'Shelf and back-room counts per outlet and product.'),
+      T('Stock', 'box', '/stock', ['stock.view'], 'Stock issued to agents, sold and returned.', { feature: 'sales' }),
       T('On-shelf availability', 'checkCircle', '/osa', ['osa.view'], 'Which products were on the shelf and which were missing.'),
       T('Merchandising', 'layers', '/merchandising', ['merchandising.view'], 'Shelf and display checks.'),
     ] },
@@ -55,7 +58,7 @@ export const HUBS = {
       T('Outlet setup', 'map', '/outlet-setup', ['locations.manage'], 'Chains, outlet types, statuses, distributors and geography.'),
     ] },
   ] },
-  admin: { title: 'Admin', icon: 'shield', intro: 'Users, permissions and system care.', sections: [
+  admin: { title: 'Admin', icon: 'shield', adminOnly: true, intro: 'Users, permissions and system care.', sections: [
     { title: 'People and access', items: [
       T('Users', 'user', '/users', ['users.view'], 'Create users, reset passwords, and switch "Can add outlets" per agent.'),
       T('Roles & permissions', 'shield', '/roles', ['roles.view', 'users.view'], 'What each role can see and do.'),
@@ -69,7 +72,7 @@ export const HUBS = {
 };
 
 const hubPerms = (k) => HUBS[k].sections.flatMap((s) => s.items.flatMap((i) => i.perm));
-const hubItem = (k) => ({ label: HUBS[k].title, icon: HUBS[k].icon, route: `/hub/${k}`, perm: hubPerms(k), hub: k, badge: k === 'results' ? 'review' : undefined,
+const hubItem = (k) => ({ adminOnly: HUBS[k].adminOnly, label: HUBS[k].title, icon: HUBS[k].icon, route: `/hub/${k}`, perm: hubPerms(k), hub: k, badge: k === 'results' ? 'review' : undefined,
   also: HUBS[k].sections.flatMap((s) => s.items.map((i) => i.route)) });
 
 export const NAV = [

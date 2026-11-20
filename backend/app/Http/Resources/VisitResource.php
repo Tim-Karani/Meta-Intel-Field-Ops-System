@@ -27,6 +27,7 @@ class VisitResource extends JsonResource
             'checkin' => $this->whenLoaded('checkin'), 'checkout' => $this->whenLoaded('checkout'),
             'responses' => $this->whenLoaded('responses', fn () => $this->responses->pluck('value', 'question_id')),
             'sales' => $this->whenLoaded('sales'), 'osa_records' => $this->whenLoaded('osaRecords'),
+            'orders' => $this->whenLoaded('orders'), 'expiry_records' => $this->whenLoaded('expiryRecords'), 'stock_counts' => $this->whenLoaded('stockCounts'),
             'merchandising_records' => $this->whenLoaded('merchandisingRecords'),
             'photos' => $this->whenLoaded('photos', fn () => $this->photos->map(fn ($p) => $p->toArray() + ['url' => "/api/v1/photos/{$p->id}/file"])->all()),
             'issues' => $this->whenLoaded('issues', fn () => $this->issues->map->only(['id', 'title', 'status', 'priority'])->all()),

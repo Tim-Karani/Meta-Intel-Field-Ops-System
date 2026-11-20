@@ -17,7 +17,7 @@ class VisitController extends ApiController
 {
     private const DETAIL = [
         'campaign:id,name', 'activity:id,name', 'location', 'agent:id,name', 'reviewer:id,name', 'checkin', 'checkout',
-        'responses', 'sales.items.product:id,name,sku', 'osaRecords.product:id,name', 'merchandisingRecords', 'photos', 'issues', 'events',
+        'responses', 'sales.items.product:id,name,sku', 'osaRecords.product:id,name', 'orders.items.product:id,name,sku', 'expiryRecords.product:id,name', 'stockCounts.product:id,name', 'merchandisingRecords', 'photos', 'issues', 'events',
     ];
 
     public function __construct(private VisitService $service) {}

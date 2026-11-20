@@ -1,6 +1,6 @@
 import { h, clear, debounce } from './core/dom.js';
 import { icon } from './core/icons.js';
-import { session, canAny, can, roleName, scopeType, hasFeature } from './core/auth.js';
+import { session, canAny, can, roleName, scopeType, hasFeature, isAdminRole } from './core/auth.js';
 import { api } from './core/api.js';
 import { initials, relTime } from './core/format.js';
 import { NAV } from './nav.js';
@@ -21,7 +21,7 @@ export function createShell({ onLogout }) {
   const shell = h('div', { class: 'shell' });
   let reviewBadge = null;
 
-  const visible = NAV.map((g) => ({ ...g, items: g.items.filter((i) => canAny(i.perm) && !(i.hideFor === 'client' && scopeType() === 'client') && (!i.feature || hasFeature(i.feature))) })).filter((g) => g.items.length);
+  const visible = NAV.map((g) => ({ ...g, items: g.items.filter((i) => canAny(i.perm) && (!i.adminOnly || isAdminRole()) && !(i.hideFor === 'client' && scopeType() === 'client') && (!i.feature || hasFeature(i.feature))) })).filter((g) => g.items.length);
   const links = new Map();
   const alias = new Map(); // child page route -> the menu item that groups it
   for (const g of visible) {

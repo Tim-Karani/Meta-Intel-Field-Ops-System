@@ -66,6 +66,8 @@ Route::prefix('v1')->group(function () {
         Route::put('users/{id}', [V1\UserController::class, 'update'])->middleware('permission:users.edit');
         Route::post('users/{id}/disable', [V1\UserController::class, 'disable'])->middleware('permission:users.disable');
         Route::post('users/{id}/enable', [V1\UserController::class, 'enable'])->middleware('permission:users.disable');
+        Route::post('users/{id}/reset-password', [V1\UserController::class, 'resetPassword'])->middleware('permission:users.edit');
+        Route::post('users/{id}/unlock', [V1\UserController::class, 'unlock'])->middleware('permission:users.edit');
         Route::post('users/{id}/send-reset-link', [V1\UserController::class, 'sendResetLink'])->middleware('permission:users.edit');
         Route::delete('users/{id}', [V1\UserController::class, 'destroy'])->middleware('permission:users.disable');
         Route::get('roles', [V1\RoleController::class, 'index'])->middleware('permission:roles.view,users.view');
@@ -199,8 +201,9 @@ Route::prefix('v1')->group(function () {
         // ---- forms ----
         Route::middleware('permission:forms.view')->group(function () {
             Route::get('forms', [V1\FormController::class, 'index']);
-            Route::get('forms/{id}', [V1\FormController::class, 'show']);
         });
+        // Reviewers need the form's questions to read a visit, so the single-form read also accepts visits.view.
+        Route::get('forms/{id}', [V1\FormController::class, 'show'])->middleware('permission:forms.view,visits.view');
         Route::middleware('permission:forms.manage')->group(function () {
             Route::post('forms', [V1\FormController::class, 'store']);
             Route::patch('forms/{id}', [V1\FormController::class, 'update']);
@@ -290,6 +293,9 @@ Route::prefix('v1')->group(function () {
             Route::get('visits/{id}', [V1\VisitController::class, 'show']);
             Route::get('visits/{visit}/sales', [V1\VisitDataController::class, 'sales']);
             Route::get('visits/{visit}/osa', [V1\VisitDataController::class, 'osa']);
+            Route::get('visits/{visit}/orders', [V1\VisitDataController::class, 'orders']);
+            Route::get('visits/{visit}/expiries', [V1\VisitDataController::class, 'expiries']);
+            Route::get('visits/{visit}/stock-counts', [V1\VisitDataController::class, 'stockCounts']);
             Route::get('visits/{visit}/merchandising', [V1\VisitDataController::class, 'merchandising']);
         });
         Route::post('visits', [V1\VisitController::class, 'store'])->middleware('permission:visits.create');
@@ -299,6 +305,9 @@ Route::prefix('v1')->group(function () {
             Route::put('visits/{id}/responses', [V1\VisitController::class, 'responses']);
             Route::post('visits/{visit}/sales', [V1\VisitDataController::class, 'storeSale']);
             Route::put('visits/{visit}/osa', [V1\VisitDataController::class, 'saveOsa']);
+            Route::post('visits/{visit}/orders', [V1\VisitDataController::class, 'storeOrder']);
+            Route::post('visits/{visit}/expiries', [V1\VisitDataController::class, 'storeExpiry']);
+            Route::put('visits/{visit}/stock-counts', [V1\VisitDataController::class, 'saveStockCount']);
             Route::post('visits/{visit}/merchandising', [V1\VisitDataController::class, 'storeMerchandising']);
         });
         Route::post('visits/{id}/submit', [V1\VisitController::class, 'submit'])->middleware('permission:visits.submit');
@@ -309,6 +318,9 @@ Route::prefix('v1')->group(function () {
         // read-only operational data listings
         Route::get('sales', [V1\SaleController::class, 'index'])->middleware('permission:sales.view');
         Route::get('osa', [V1\OsaController::class, 'index'])->middleware('permission:osa.view');
+        Route::get('orders', [V1\OrderController::class, 'index'])->middleware('permission:sales.view');
+        Route::get('expiries', [V1\ExpiryController::class, 'index'])->middleware('permission:stock.view');
+        Route::get('stock-counts', [V1\StockCountController::class, 'index'])->middleware('permission:stock.view');
         Route::get('merchandising', [V1\MerchandisingController::class, 'index'])->middleware('permission:merchandising.view');
 
         // ---- evidence ----

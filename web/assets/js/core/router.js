@@ -1,4 +1,4 @@
-import { session, canAny } from './auth.js';
+import { session, canAny, isAdminRole } from './auth.js';
 
 /* Hash router with auth + permission guards. Route table lives in ../routes.js. */
 let table = [];
@@ -41,6 +41,7 @@ export function resolve() {
   if (!match) state = { status: 404, path, query, params: {} };
   else if (match.route.public) state = { status: 200, route: match.route, path, query, params: match.params };
   else if (!session.isAuthenticated) state = { status: 401, path, query, params: {} };
+  else if (match.route.adminOnly && !isAdminRole()) state = { status: 403, route: match.route, path, query, params: match.params };
   else if (match.route.perm && !canAny(match.route.perm)) state = { status: 403, route: match.route, path, query, params: match.params };
   else state = { status: 200, route: match.route, path, query, params: match.params };
   current = state;

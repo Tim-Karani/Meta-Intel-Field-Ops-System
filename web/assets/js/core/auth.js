@@ -30,4 +30,6 @@ export const scopeType = () => state.user?.scope_type || 'none';
 export const isClientUser = () => scopeType() === 'client';
 export const isFieldAgent = () => scopeType() === 'own';
 export const roleName = () => state.user?.roles?.[0]?.name || '';
+/** The Admin menu (users, roles, audit, system, settings) is for these two roles only. */
+export const isAdminRole = () => !!state.user?.roles?.some((r) => r.slug === 'system_admin' || r.slug === 'operations_manager');
 export const hasRole = (slug) => !!state.user?.roles?.some((r) => r.slug === slug);

@@ -38,20 +38,20 @@ export default async function render({ container, params }) {
 
     const transitions = canEdit ? (c.allowed_transitions || []).map((s) => h('button', { class: ['btn', s === 'archived' ? 'danger' : s === 'active' ? 'primary' : ''], type: 'button', onclick: () => transition(c, s, reload) }, TRANSITION_LABEL[s] || `Move to ${titleCase(s)}`)) : [];
 
-    const canJp = !!c.settings?.journey_plan && (can('assignments.view') || can('assignments.create'));
+    const canJp = !!c.settings?.journey_plan && can('assignments.create');
     const sub = (items) => tabs(items.filter(Boolean));
     let ws; // the workspace tabs, so the checklist can jump between them
     const go = (key) => ws?.select(key);
     ws = tabs([
       { key: 'overview', label: 'Overview', render: () => overview(c, plans, go) },
-      { key: 'setup', label: 'Setup', render: () => h('div', { class: 'stack' }, activitiesTab(c, reload), kpiTab(c)) },
+      can('activities.view') && { key: 'setup', label: 'Setup', render: () => h('div', { class: 'stack' }, activitiesTab(c, reload), kpiTab(c)) },
       { key: 'outlets', label: 'Outlets & team', render: () => resourcesTab(c, reload, go) },
       canJp && { key: 'plans', label: 'Journey plans', render: (panel) => { const host = h('div', { class: 'stack' }); plansPanel({ container: host, campaigns: [{ value: c.id, label: c.name }], campaign: c }); return h('div', { class: 'stack' }, host, h('h3', { class: 'hub-title' }, 'Jobs given on a single date'), assignmentsTab(c)); } },
-      !canJp && { key: 'plans', label: 'Assignments', render: () => assignmentsTab(c) },
-      { key: 'results', label: 'Visits & results', render: () => sub([
-        { key: 'visits', label: 'Visits', render: () => visitsTab(c) },
-        { key: 'issues', label: 'Issues', render: () => issuesTab(c) },
-        { key: 'evidence', label: 'Photos', render: () => evidenceTab(c) },
+      !canJp && can('assignments.view') && { key: 'plans', label: 'Assignments', render: () => assignmentsTab(c) },
+      (can('visits.view') || can('issues.view') || can('evidence.view') || can('reports.view')) && { key: 'results', label: 'Visits & results', render: () => sub([
+        can('visits.view') && { key: 'visits', label: 'Visits', render: () => visitsTab(c) },
+        can('issues.view') && { key: 'issues', label: 'Issues', render: () => issuesTab(c) },
+        can('evidence.view') && { key: 'evidence', label: 'Photos', render: () => evidenceTab(c) },
         can('reports.view') && { key: 'reports', label: 'Reports', render: () => reportsTab(c) },
       ]) },
     ].filter(Boolean));

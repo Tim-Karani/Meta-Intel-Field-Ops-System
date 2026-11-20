@@ -99,6 +99,18 @@ class Visit extends Model
     {
         return $this->hasMany(Sale::class);
     }
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+    public function expiryRecords(): HasMany
+    {
+        return $this->hasMany(ExpiryRecord::class);
+    }
+    public function stockCounts(): HasMany
+    {
+        return $this->hasMany(StockCount::class);
+    }
     public function osaRecords(): HasMany
     {
         return $this->hasMany(OsaRecord::class);

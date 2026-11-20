@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Domain\Access\AccessScope;
 use App\Domain\Visits\VisitDataService;
+use App\Models\ExpiryRecord;
 use App\Models\MerchandisingRecord;
+use App\Models\Order;
+use App\Models\StockCount;
 use App\Models\OsaRecord;
 use App\Models\Sale;
 use App\Models\Visit;
@@ -47,6 +50,83 @@ class VisitDataController extends ApiController
         ]);
 
         return $this->created($this->data->addSale($v, $payload), 'Sale recorded.');
+    }
+
+    /* ---- orders (quantity and value; not a sale) ---- */
+    public function orders(Request $request, string $visit): JsonResponse
+    {
+        $v = $this->visit($request, $visit);
+        $this->authorize('view', $v);
+
+        return $this->ok(Order::query()->where('visit_id', $v->id)->with('items.product:id,name,sku')->orderBy('captured_at')->get());
+    }
+
+    public function storeOrder(Request $request, string $visit): JsonResponse
+    {
+        $v = $this->visit($request, $visit);
+        $this->authorize('work', $v);
+        $payload = $request->validate([
+            'client_uuid' => ['nullable', 'uuid'],
+            'captured_at' => ['nullable', 'date', 'before_or_equal:+5 minutes'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+            'items' => ['required', 'array', 'min:1', 'max:100'],
+            'items.*.product_id' => ['required', 'uuid'],
+            'items.*.quantity' => ['required', 'integer', 'min:1', 'max:100000'],
+            'items.*.unit_price' => ['nullable', 'numeric', 'min:0', 'max:10000000'],
+        ]);
+
+        return $this->created($this->data->addOrder($v, $payload), 'Order recorded.');
+    }
+
+    /* ---- expiries (expiry date and quantity) ---- */
+    public function expiries(Request $request, string $visit): JsonResponse
+    {
+        $v = $this->visit($request, $visit);
+        $this->authorize('view', $v);
+
+        return $this->ok(ExpiryRecord::query()->where('visit_id', $v->id)->with('product:id,name,sku')->orderBy('expiry_date')->get());
+    }
+
+    public function storeExpiry(Request $request, string $visit): JsonResponse
+    {
+        $v = $this->visit($request, $visit);
+        $this->authorize('work', $v);
+        $payload = $request->validate([
+            'client_uuid' => ['nullable', 'uuid'],
+            'product_id' => ['required', 'uuid'],
+            'expiry_date' => ['required', 'date_format:Y-m-d', 'after:2000-01-01', 'before:2100-01-01'],
+            'quantity' => ['required', 'integer', 'min:1', 'max:1000000'],
+            'batch_no' => ['nullable', 'string', 'max:60'],
+            'captured_at' => ['nullable', 'date', 'before_or_equal:+5 minutes'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        return $this->created($this->data->addExpiry($v, $payload), 'Expiry recorded.');
+    }
+
+    /* ---- stock count (shelf + back room per product) ---- */
+    public function stockCounts(Request $request, string $visit): JsonResponse
+    {
+        $v = $this->visit($request, $visit);
+        $this->authorize('view', $v);
+
+        return $this->ok(StockCount::query()->where('visit_id', $v->id)->with('product:id,name,sku')->get());
+    }
+
+    public function saveStockCount(Request $request, string $visit): JsonResponse
+    {
+        $v = $this->visit($request, $visit);
+        $this->authorize('work', $v);
+        $payload = $request->validate([
+            'client_uuid' => ['nullable', 'uuid'],
+            'product_id' => ['required', 'uuid'],
+            'shelf_quantity' => ['required', 'integer', 'min:0', 'max:1000000'],
+            'backroom_quantity' => ['nullable', 'integer', 'min:0', 'max:1000000'],
+            'captured_at' => ['nullable', 'date', 'before_or_equal:+5 minutes'],
+            'notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        return $this->ok($this->data->saveStockCount($v, $payload), 'Stock count recorded.');
     }
 
     /* ---- OSA ---- */

@@ -41,6 +41,11 @@ export default async function render({ container, params }) {
         { key: 'responses', label: 'Form responses', render: () => responsesTab(v) },
         ...(hasFeature('sales') || v.sales?.length ? [{ key: 'sales', label: `Sales (${v.sales?.length ?? 0})`, render: () => salesTab(v) }] : []),
         { key: 'osa', label: `OSA (${v.osa_records?.length ?? 0})`, render: () => osaTab(v) },
+        ...(v.orders?.length ? [{ key: 'orders', label: `Orders (${v.orders.length})`, render: () => ordersTab(v) }] : []),
+        ...(v.stock_counts?.length ? [{ key: 'stockc', label: `Stock count (${v.stock_counts.length})`, render: () => card('Stock count', simpleTable([
+          { label: 'Product', render: (r) => r.product?.name || '—' }, { label: 'Shelf', align: 'right', key: 'shelf_quantity' }, { label: 'Back room', align: 'right', key: 'backroom_quantity' }, { label: 'Total', align: 'right', key: 'total_quantity' }], v.stock_counts), { flush: true }) }] : []),
+        ...(v.expiry_records?.length ? [{ key: 'expiry', label: `Expiries (${v.expiry_records.length})`, render: () => card('Expiries', simpleTable([
+          { label: 'Product', render: (r) => r.product?.name || '—' }, { label: 'Batch', render: (r) => r.batch_no || '—' }, { label: 'Expiry date', render: (r) => fmtDate(r.expiry_date) }, { label: 'Quantity', align: 'right', key: 'quantity' }], v.expiry_records), { flush: true }) }] : []),
         { key: 'merch', label: `Merchandising (${v.merchandising_records?.length ?? 0})`, render: () => merchTab(v) },
         { key: 'photos', label: `Photos (${v.photos?.length ?? 0})`, render: () => photoGrid((v.photos || []).map((p) => ({ ...p, visit: { location: v.location, campaign: v.campaign } })), { onChange: reload }) },
       ]));
@@ -101,6 +106,9 @@ const salesTab = (v) => (v.sales?.length ? h('div', { class: 'stack' }, v.sales.
   { label: 'Product', render: (it) => it.product?.name || '—' }, { label: 'Qty', align: 'right', render: (it) => fmtNumber(it.quantity) }, { label: 'Unit price', align: 'right', render: (it) => fmtMoney(it.unit_price) },
   { label: 'Line total', align: 'right', render: (it) => fmtMoney(it.line_total ?? Number(it.quantity) * Number(it.unit_price)) }, { label: 'Promo', render: (it) => (it.is_promo ? badge('promo', { tone: 'info' }) : '') }], s.items || []),
 { flush: true, actions: h('span', { class: 'small' }, `${titleCase(s.payment_method || '')} · `, h('strong', null, fmtMoney(s.total_value))) }))) : empty('No sales recorded'));
+const ordersTab = (v) => h('div', { class: 'stack' }, v.orders.map((o, i) => card(`Order ${i + 1} · ${fmtDateTime(o.captured_at)}`, simpleTable([
+  { label: 'Product', render: (it) => it.product?.name || '—' }, { label: 'Qty', align: 'right', render: (it) => fmtNumber(it.quantity) }, { label: 'Unit price', align: 'right', render: (it) => fmtMoney(it.unit_price) },
+  { label: 'Line total', align: 'right', render: (it) => fmtMoney(it.line_total) }], o.items || []), { flush: true, actions: h('strong', null, fmtMoney(o.total_value)) })));
 const yn = (b) => (b === null || b === undefined ? '—' : b ? badge('yes', { tone: 'ok' }) : badge('no', { tone: 'danger' }));
 const osaTab = (v) => (v.osa_records?.length ? card('On-shelf availability', simpleTable([
   { label: 'Product', render: (r) => r.product?.name || '—' }, { label: 'Available', render: (r) => yn(r.available) }, { label: 'Out of stock', render: (r) => yn(r.out_of_stock) },

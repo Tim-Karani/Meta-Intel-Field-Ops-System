@@ -287,6 +287,21 @@ class AccessScope
         return self::byVisit($q, $user);
     }
 
+    public static function forOrder(Builder $q, User $user): Builder
+    {
+        return self::byVisit($q, $user);
+    }
+
+    public static function forExpiryRecord(Builder $q, User $user): Builder
+    {
+        return self::byVisit($q, $user);
+    }
+
+    public static function forStockCount(Builder $q, User $user): Builder
+    {
+        return self::byVisit($q, $user);
+    }
+
     public static function forOsaRecord(Builder $q, User $user): Builder
     {
         return self::byVisit($q, $user);

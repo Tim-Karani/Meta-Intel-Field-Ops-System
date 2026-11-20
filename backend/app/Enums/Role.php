@@ -19,7 +19,7 @@ enum Role: string
     {
         return match ($this) {
             self::SystemAdmin => 'System Administrator',
-            self::OperationsManager => 'Agency / Operations Manager',
+            self::OperationsManager => 'Agency',
             self::CampaignManager => 'Project Manager',
             self::Supervisor => 'Supervisor',
             self::TeamLeader => 'Team Leader',

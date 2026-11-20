@@ -62,3 +62,13 @@ flutter build appbundle --release --dart-define=API_BASE_URL=https://metaintel.o
 - **Test phones may still have the old tunnel address saved.** Uninstall the old test app (you must anyway for the first signed build); they then pick up the new default.
 - If the address ever changes, phones with the old build need the manual setting or a new build.
 - The same flag works for the plain APK you send by file.
+
+## Reminder for when the server and domain are being connected
+Email for reset links (full steps in docs/EMAIL_SETUP.md):
+1. Create a free Brevo account (300 emails a day) in the company's name.
+2. Verify the sending domain: add Brevo's DNS records in Namecheap > Advanced DNS.
+3. Create an SMTP key in Brevo.
+4. In backend/.env on the server set MAIL_MAILER=smtp, MAIL_HOST, MAIL_PORT=587, MAIL_USERNAME, MAIL_PASSWORD, MAIL_FROM_ADDRESS=noreply@yourdomain, MAIL_FROM_NAME="MetaIntel", WEB_URL=https://your-real-address
+5. docker compose up -d --force-recreate app queue scheduler
+6. System health > Send test email.
+Until then "Reset password now" on the Users page works without email.

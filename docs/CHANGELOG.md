@@ -1,6 +1,22 @@
 # Changelog
 
+## 1.13.0
+- New captures, on the phone (offline) and on the web, each with a CSV report: **Orders** (products, quantity, price, value; separate from Sales), **Expiries** (product, expiry date, quantity, batch, capture date) and **Stock count** (shelf and back room per product).
+- Web: Results > Orders, Expiries, Stock count; tabs on the visit page; reports "Orders", "Expiries", "Stock count".
+- Project setup: three new switches (Orders, Stock count, Expiries). Stock count and Expiries are on by default for merchandising and general-trade projects; Orders on for general trade and sales rep. Existing projects keep working; check their switches.
+- Needs `php artisan migrate` (new tables) and a phone app rebuild.
+
+## 1.12.2
+- Admin menu (Users, Roles, Audit, System health, Settings) now only for System Administrator and Agency; hidden and blocked for everyone else.
+- Role "Agency / Operations Manager" renamed "Agency".
+
+## 1.12.1
+- Super administrator: reset any user's password now (generated or typed, shown once, signs them out everywhere), unlock locked accounts, "Locked" badge in the Users list. Audited.
+- Permissions: campaign pages hide tabs the role cannot read (Setup, Assignments/Journey plans, Visits, Issues, Photos, Reports). Reviewers can read a visit's form questions with visits.view.
+- New docs/ROLES_AND_PERMISSIONS.md.
+
 ## 1.12.0 - Outlets show who last edited them
+- Outlet setup now opens on an "Outlets" tab with the full outlet table (add, edit, delete, bulk change), ahead of Chains, Types, Statuses, Distributors and Geography.
 - Outlet list now follows the office layout: ID, Name, Type, Status, Geo, Phone no., Channel, Distributor, Last edited by.
 - New: an outlet remembers the last person who changed it (migration 000016). Who created it is kept; the outlet page shows both.
 - New: "Change history" tab on an outlet (people with audit access): who changed what, with before and after values, from the audit log.

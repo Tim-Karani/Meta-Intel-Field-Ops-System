@@ -194,6 +194,38 @@ class UserController extends ResourceController
         return $this->ok($this->present($user->fresh($this->with)), 'User enabled.');
     }
 
+    /**
+     * Admin sets a new temporary password right now (no email needed). The password is shown once,
+     * the person must change it at next sign-in, every signed-in device is signed out and any lock is cleared.
+     */
+    public function resetPassword(Request $request, string $id): JsonResponse
+    {
+        $user = $this->findScoped($request, $id);
+        $this->authorize('update', $user);
+        if ($user->getKey() === $request->user()->getKey()) {
+            throw new DomainRuleException('Use My profile to change your own password.', 'self_reset');
+        }
+        $data = $request->validate(['password' => ['nullable', 'string', 'min:10', 'max:128']]);
+        $password = $data['password'] ?? Str::password(14, symbols: false);
+        $user->forceFill(['password' => $password, 'must_change_password' => true, 'failed_logins' => 0, 'locked_until' => null])->save();
+        $user->tokens()->delete();
+        SecurityEvents::log('password_reset_by_admin', $user->getKey(), 'warning', ['by' => $request->user()->getKey()]);
+        AuditService::record('user.password_reset', 'users', $user);
+
+        return $this->ok(['temporary_password' => $password], 'Password reset. Share it with the person privately; they must change it at next sign-in.');
+    }
+
+    /** Clear a lockout from too many wrong passwords, without changing the password. */
+    public function unlock(Request $request, string $id): JsonResponse
+    {
+        $user = $this->findScoped($request, $id);
+        $this->authorize('update', $user);
+        $user->forceFill(['failed_logins' => 0, 'locked_until' => null])->save();
+        AuditService::record('user.unlocked', 'users', $user);
+
+        return $this->ok($this->present($user->fresh($this->with)), 'Account unlocked.');
+    }
+
     public function sendResetLink(Request $request, string $id): JsonResponse
     {
         $user = $this->findScoped($request, $id);

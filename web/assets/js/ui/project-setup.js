@@ -7,7 +7,8 @@ import { enumOptions } from '../core/lookups.js';
    changed for this one project. The server stores the result on the campaign and the phone app follows it. */
 
 export const TASKS = [
-  { value: 'form', label: 'Visit form' }, { value: 'sales', label: 'Sales (sales reps, foot soldiers)' }, { value: 'osa', label: 'On-shelf availability' },
+  { value: 'form', label: 'Visit form' }, { value: 'sales', label: 'Sales (sales reps, foot soldiers)' }, { value: 'orders', label: 'Orders (quantity and value)' }, { value: 'osa', label: 'On-shelf availability' },
+  { value: 'stock_count', label: 'Stock count (shelf and back room)' }, { value: 'expiries', label: 'Expiries (date and quantity)' },
   { value: 'merchandising', label: 'Merchandising' }, { value: 'photos', label: 'Photos & evidence' },
 ];
 export const SOURCES = [
@@ -51,7 +52,7 @@ export const fromSettings = (s = {}) => ({
   s_outlet_source: s.outlet_source ?? 'mixed', s_journey_plan: !!s.journey_plan,
   s_capture_geo: s.capture_geo ?? 'office_only',
   s_t_osa: s.targets?.osa_pct ?? '', s_t_sos: s.targets?.sos_pct ?? '', s_t_coverage: s.targets?.coverage_pct ?? '', s_t_freq: s.targets?.visits_per_outlet ?? '',
-  s_tasks: Object.entries(s.tasks ?? { form: true, sales: false, osa: true, merchandising: true, photos: true }).filter(([, on]) => on).map(([k]) => k),
+  s_tasks: Object.entries(s.tasks ?? { form: true, sales: false, orders: false, osa: true, stock_count: true, expiries: true, merchandising: true, photos: true }).filter(([, on]) => on).map(([k]) => k),
   s_visit_photos: s.visit_photos ?? true, s_min_photos: s.min_photos ?? 0, s_visit_label: s.visit_label ?? 'Visit', s_outlet_type: s.outlet_type ?? 'retail_store',
 });
 

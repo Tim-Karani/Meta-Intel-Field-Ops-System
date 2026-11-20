@@ -274,6 +274,9 @@ class SyncService {
       case 'visit_sale':
       case 'visit_osa':
       case 'visit_merch':
+      case 'visit_order':
+      case 'visit_expiry':
+      case 'visit_stockcount':
         final item = await _repo.itemPayload('${p['item_id']}');
         if (item == null) return;
         final sid = await _sid(op);
@@ -281,6 +284,12 @@ class SyncService {
           await _api.post('visits/$sid/sales', body: item);
         } else if (op.type == 'visit_osa') {
           await _api.put('visits/$sid/osa', body: item);
+        } else if (op.type == 'visit_order') {
+          await _api.post('visits/$sid/orders', body: item);
+        } else if (op.type == 'visit_expiry') {
+          await _api.post('visits/$sid/expiries', body: item);
+        } else if (op.type == 'visit_stockcount') {
+          await _api.put('visits/$sid/stock-counts', body: item);
         } else {
           await _api.post('visits/$sid/merchandising', body: item);
         }

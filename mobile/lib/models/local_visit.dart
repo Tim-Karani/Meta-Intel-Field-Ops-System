@@ -140,7 +140,7 @@ class ProjectRules {
     if (s == null) return const ProjectRules();
     final t = s.obj('tasks') ?? const <String, dynamic>{};
     return ProjectRules(
-      tasks: {for (final k in const ['form', 'sales', 'osa', 'merchandising', 'photos']) k: t[k] != false},
+      tasks: {for (final k in const ['form', 'sales', 'orders', 'osa', 'stock_count', 'expiries', 'merchandising', 'photos']) k: t[k] != false},
       minPhotos: s.integer('min_photos') ?? 0,
       visitLabel: (s.str('visit_label') ?? '').trim().isEmpty ? 'Visit' : s.str('visit_label')!.trim(),
       visitPhotos: s['visit_photos'] != false,

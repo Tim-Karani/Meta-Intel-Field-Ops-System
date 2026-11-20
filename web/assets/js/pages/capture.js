@@ -28,6 +28,26 @@ const KINDS = {
       { key: 'out_of_stock', label: 'Out of stock', render: (r) => yn(r.out_of_stock) }, { key: 'shelf_quantity', label: 'Shelf qty', align: 'right', render: (r) => fmtNumber(r.shelf_quantity) },
       { key: 'facings', label: 'Facings', align: 'right', render: (r) => fmtNumber(r.facings) }, { key: 'price_on_shelf', label: 'Shelf price', align: 'right', render: (r) => fmtMoney(r.price_on_shelf) }],
   },
+  orders: {
+    title: 'Orders', subtitle: 'Orders taken at outlets: quantity and value.', endpoint: 'orders', sort: '-captured_at',
+    columns: [...visitCols,
+      { key: 'items', label: 'Items', render: (r) => h('span', { title: (r.items || []).map((i) => `${i.product?.name} × ${i.quantity}`).join('\n') }, (r.items || []).slice(0, 2).map((i) => `${i.product?.name || '?'} × ${i.quantity}`).join(', ') + ((r.items || []).length > 2 ? ` +${r.items.length - 2}` : '')) },
+      { key: 'qty', label: 'Quantity', align: 'right', render: (r) => fmtNumber((r.items || []).reduce((a, i) => a + i.quantity, 0)) },
+      { key: 'total_value', label: 'Value', sort: 'total_value', align: 'right', render: (r) => h('strong', null, fmtMoney(r.total_value)) },
+      { key: 'captured_at', label: 'Captured', sort: 'captured_at', render: (r) => fmtDateTime(r.captured_at) }],
+  },
+  expiries: {
+    title: 'Expiries', subtitle: 'Stock that expires: product, expiry date and quantity, with the date it was captured.', endpoint: 'expiries', sort: 'expiry_date',
+    columns: [...visitCols, { key: 'product', label: 'Product', render: (r) => r.product?.name || '—' }, { key: 'batch_no', label: 'Batch', render: (r) => r.batch_no || '—' },
+      { key: 'expiry_date', label: 'Expiry date', sort: 'expiry_date', render: (r) => fmtDate(r.expiry_date) }, { key: 'quantity', label: 'Quantity', align: 'right', render: (r) => fmtNumber(r.quantity) },
+      { key: 'captured_at', label: 'Captured', sort: 'captured_at', render: (r) => fmtDateTime(r.captured_at) }],
+  },
+  stock_counts: {
+    title: 'Stock count', subtitle: 'What is at the outlet: on the shelf and in the back room.', endpoint: 'stock-counts', sort: '-captured_at',
+    columns: [...visitCols, { key: 'product', label: 'Product', render: (r) => r.product?.name || '—' }, { key: 'shelf_quantity', label: 'Shelf', align: 'right', render: (r) => fmtNumber(r.shelf_quantity) },
+      { key: 'backroom_quantity', label: 'Back room', align: 'right', render: (r) => fmtNumber(r.backroom_quantity) }, { key: 'total_quantity', label: 'Total', align: 'right', render: (r) => h('strong', null, fmtNumber(r.total_quantity)) },
+      { key: 'captured_at', label: 'Captured', sort: 'captured_at', render: (r) => fmtDateTime(r.captured_at) }],
+  },
   merchandising: {
     title: 'Merchandising', subtitle: 'POSM, planogram and price compliance.', endpoint: 'merchandising', sort: '-captured_at',
     columns: [...visitCols, { key: 'product', label: 'Product', render: (r) => r.product?.name || '—' }, { key: 'posm_present', label: 'POSM', render: (r) => yn(r.posm_present) },

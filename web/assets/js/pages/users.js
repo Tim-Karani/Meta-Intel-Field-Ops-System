@@ -38,7 +38,7 @@ export default async function render({ container }) {
   };
   const scrub = (v) => { const o = { ...v }; Object.keys(o).forEach((k) => { if (o[k] === null || o[k] === '') delete o[k]; }); if (o.role !== 'client_user') delete o.client_id; if (o.role !== 'field_agent') ['agent_type', 'employment_type', 'agent_code', 'team_leader_id'].forEach((k) => delete o[k]); if (o.role !== 'field_agent' && o.role !== 'team_leader') ['supervisor_id', 'region', 'pay_type', 'pay_rate'].forEach((k) => delete o[k]); return o; };
 
-  const tempPassword = (pw, email) => openModal({ title: 'User created', size: 'sm', body: h('div', { class: 'stack sm' },
+  const tempPassword = (pw, email, tempTitle = 'User created') => openModal({ title: tempTitle, size: 'sm', body: h('div', { class: 'stack sm' },
     h('p', null, `Share this temporary password with ${email} through a secure channel. It is shown only once; they must change it at first sign-in.`),
     h('code', { class: 'mono', style: { fontSize: '1.1rem', padding: '10px', background: 'var(--neutral-bg)', borderRadius: '6px', display: 'block', userSelect: 'all' } }, pw)),
   footer: (close) => [h('button', { class: 'btn', type: 'button', onclick: () => navigator.clipboard?.writeText(pw).then(() => toast('Copied.')) }, 'Copy'), h('button', { class: 'btn primary', type: 'button', onclick: () => close() }, 'Done')] });
@@ -71,6 +71,15 @@ export default async function render({ container }) {
     try { await api.post(`users/${u.id}/send-reset-link`); toast('Reset link sent.'); } catch (e) { toastError(e); }
   };
 
+  /** Super administrator sets a new temporary password right away: auto-generated, or typed in. Shown once. */
+  const setPassword = (u) => {
+    const { form } = formModal({ title: `Reset password for ${u.name}`, size: 'sm', submitLabel: 'Reset password',
+      fields: [{ name: 'password', label: 'New temporary password', type: 'text', autocomplete: 'off', full: true, help: 'Leave blank to generate a strong one (recommended). At least 10 characters if you type your own. They are signed out everywhere and must change it at next sign-in.' }],
+      onSubmit: async (v) => (await api.post(`users/${u.id}/reset-password`, v.password ? { password: v.password } : {})).data,
+      onSaved: (res) => { reload(); if (res?.temporary_password) tempPassword(res.temporary_password, u.email, 'Password reset'); } });
+  };
+  const unlock = async (u) => { try { await api.post(`users/${u.id}/unlock`); toast(`${u.name} can sign in again.`); reload(); } catch (e) { toastError(e); } };
+
   container.append(pageHead({ title: 'Users', subtitle: 'Staff, field agents and client users.', actions: can('users.create') && h('button', { class: 'btn primary', type: 'button', onclick: create }, icon('plus', { size: 16 }), 'New user') }));
   table = dataTable({
     endpoint: 'users', defaultSort: 'name', searchPlaceholder: 'Search name, email, phone…',
@@ -80,10 +89,12 @@ export default async function render({ container }) {
       { key: 'role', label: 'Role', render: (r) => (r.roles || []).map((x) => x.name).join(', ') || '—' },
       { key: 'client', label: 'Client / region', render: (r) => r.client?.name || (r.agent_profile ? [r.agent_profile.employment_type === 'reliever' ? 'Reliever' : 'Permanent', r.agent_profile.region].filter(Boolean).join(' · ') : '—') },
       { key: 'adds', label: 'Adds outlets', render: (r) => (r.agent_profile ? outletSwitch(r) : h('span', { class: 'muted' }, '—')) },
-      { key: 'status', label: 'Status', sort: 'status', render: (r) => badge(r.status) },
+      { key: 'status', label: 'Status', sort: 'status', render: (r) => h('span', null, badge(r.status), r.is_locked && badge('locked', { tone: 'warn', label: 'Locked' })) },
       { key: 'last_login_at', label: 'Last sign-in', sort: 'last_login_at', render: (r) => (r.last_login_at ? h('span', { title: fmtDateTime(r.last_login_at) }, relTime(r.last_login_at)) : h('span', { class: 'muted' }, 'Never')) },
       { key: '_a', label: '', align: 'right', render: (r) => h('div', { class: 'row', style: { justifyContent: 'flex-end' } },
         can('users.edit') && h('button', { class: 'btn sm ghost', type: 'button', title: 'Edit', 'aria-label': `Edit ${r.name}`, onclick: () => edit(r) }, icon('edit', { size: 15 })),
+        can('users.edit') && r.id !== me && h('button', { class: 'btn sm ghost', type: 'button', title: 'Reset password now', 'aria-label': `Reset password for ${r.name}`, onclick: () => setPassword(r) }, icon('lock', { size: 15 })),
+        can('users.edit') && r.is_locked && h('button', { class: 'btn sm', type: 'button', onclick: () => unlock(r) }, 'Unlock'),
         can('users.edit') && h('button', { class: 'btn sm ghost', type: 'button', title: 'Send reset link', 'aria-label': `Send reset link to ${r.name}`, onclick: () => resetLink(r) }, icon('mail', { size: 15 })),
         can('users.disable') && r.id !== me && h('button', { class: 'btn sm ghost', type: 'button', title: r.status === 'disabled' ? 'Enable' : 'Disable', 'aria-label': `${r.status === 'disabled' ? 'Enable' : 'Disable'} ${r.name}`, onclick: () => toggle(r) }, icon(r.status === 'disabled' ? 'check' : 'lock', { size: 15 }))) },
     ],

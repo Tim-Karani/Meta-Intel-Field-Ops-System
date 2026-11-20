@@ -14,7 +14,7 @@ class UserResource extends JsonResource
     {
         return [
             'id' => $this->id, 'name' => $this->name, 'email' => $this->email, 'username' => $this->username, 'phone' => $this->phone,
-            'status' => $this->status->value, 'client_id' => $this->client_id, 'must_change_password' => $this->must_change_password,
+            'status' => $this->status->value, 'client_id' => $this->client_id, 'must_change_password' => $this->must_change_password, 'is_locked' => $this->isLocked(),
             'last_login_at' => $this->last_login_at?->toIso8601String(), 'created_at' => $this->created_at?->toIso8601String(),
             'roles' => $this->whenLoaded('roles', fn () => $this->roles->map(fn ($r) => ['slug' => $r->slug, 'name' => $r->name])->all()),
             'client' => $this->whenLoaded('client', fn () => $this->client ? ['id' => $this->client->id, 'name' => $this->client->name] : null),

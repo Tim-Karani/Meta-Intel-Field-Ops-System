@@ -17,6 +17,7 @@ import '../features/visits/merch_page.dart';
 import '../features/visits/osa_page.dart';
 import '../features/visits/photos_page.dart';
 import '../features/visits/sales_page.dart';
+import '../features/visits/stock_pages.dart';
 import '../features/visits/visit_page.dart';
 import '../features/visits/visits_page.dart';
 import '../features/work/assignment_detail_page.dart';
@@ -52,6 +53,9 @@ GoRouter buildRouter(Session session) {
       GoRoute(path: '/visit/:id', builder: (c, s) => VisitPage(visitId: s.pathParameters['id']!)),
       GoRoute(path: '/visit/:id/form', builder: (c, s) => FormPage(visitId: s.pathParameters['id']!)),
       GoRoute(path: '/visit/:id/sales', builder: (c, s) => SalesPage(visitId: s.pathParameters['id']!)),
+      GoRoute(path: '/visit/:id/orders', builder: (c, s) => OrdersPage(visitId: s.pathParameters['id']!)),
+      GoRoute(path: '/visit/:id/expiries', builder: (c, s) => ExpiriesPage(visitId: s.pathParameters['id']!)),
+      GoRoute(path: '/visit/:id/stockcount', builder: (c, s) => StockCountPage(visitId: s.pathParameters['id']!)),
       GoRoute(path: '/visit/:id/osa', builder: (c, s) => OsaPage(visitId: s.pathParameters['id']!)),
       GoRoute(path: '/visit/:id/merch', builder: (c, s) => MerchPage(visitId: s.pathParameters['id']!)),
       GoRoute(path: '/visit/:id/photos', builder: (c, s) => PhotosPage(visitId: s.pathParameters['id']!)),

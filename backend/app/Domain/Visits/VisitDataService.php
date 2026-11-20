@@ -2,7 +2,11 @@
 
 namespace App\Domain\Visits;
 
+use App\Models\ExpiryRecord;
 use App\Models\MerchandisingRecord;
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\StockCount;
 use App\Models\OsaRecord;
 use App\Models\Product;
 use App\Models\Sale;
@@ -51,6 +55,70 @@ class VisitDataService
 
             return $sale->load('items.product:id,name,sku');
         });
+    }
+
+    public function addOrder(Visit $visit, array $data): Order
+    {
+        $this->visits->assertEditable($visit);
+
+        return DB::transaction(function () use ($visit, $data) {
+            if (!empty($data['client_uuid'])) {
+                $dup = Order::query()->where('visit_id', $visit->id)->where('client_uuid', $data['client_uuid'])->first();
+                if ($dup) {
+                    return $dup->load('items.product:id,name,sku');
+                }
+            }
+            $order = Order::query()->create([
+                'client_uuid' => $data['client_uuid'] ?? null, 'visit_id' => $visit->id,
+                'captured_at' => $data['captured_at'] ?? now(), 'notes' => $data['notes'] ?? null, 'total_value' => 0,
+            ]);
+            $total = 0;
+            foreach ($data['items'] as $item) {
+                $product = $this->campaignProduct($visit, $item['product_id']);
+                $price = $item['unit_price'] ?? $product->unit_price;
+                if ($price === null) {
+                    throw new DomainRuleException("Product \"{$product->name}\" has no price; provide unit_price.", 'price_required');
+                }
+                $line = round($price * $item['quantity'], 2);
+                $total += $line;
+                OrderItem::query()->create(['order_id' => $order->id, 'product_id' => $product->id, 'quantity' => $item['quantity'], 'unit_price' => $price, 'line_total' => $line]);
+            }
+            $order->update(['total_value' => round($total, 2)]);
+
+            return $order->load('items.product:id,name,sku');
+        });
+    }
+
+    public function addExpiry(Visit $visit, array $data): ExpiryRecord
+    {
+        $this->visits->assertEditable($visit);
+        $product = $this->campaignProduct($visit, $data['product_id']);
+        if (!empty($data['client_uuid'])) {
+            $dup = ExpiryRecord::query()->where('visit_id', $visit->id)->where('client_uuid', $data['client_uuid'])->first();
+            if ($dup) {
+                return $dup->load('product:id,name,sku');
+            }
+        }
+
+        return ExpiryRecord::query()->create([
+            'client_uuid' => $data['client_uuid'] ?? null, 'visit_id' => $visit->id, 'product_id' => $product->id,
+            'expiry_date' => $data['expiry_date'], 'quantity' => $data['quantity'], 'batch_no' => $data['batch_no'] ?? null,
+            'captured_at' => $data['captured_at'] ?? now(), 'notes' => $data['notes'] ?? null,
+        ])->load('product:id,name,sku');
+    }
+
+    public function saveStockCount(Visit $visit, array $data): StockCount
+    {
+        $this->visits->assertEditable($visit);
+        $product = $this->campaignProduct($visit, $data['product_id']);
+
+        return StockCount::query()->updateOrCreate(
+            ['visit_id' => $visit->id, 'product_id' => $product->id],
+            [
+                'client_uuid' => $data['client_uuid'] ?? null, 'shelf_quantity' => $data['shelf_quantity'] ?? 0, 'backroom_quantity' => $data['backroom_quantity'] ?? 0,
+                'captured_at' => $data['captured_at'] ?? now(), 'notes' => $data['notes'] ?? null,
+            ],
+        )->load('product:id,name,sku');
     }
 
     public function saveOsa(Visit $visit, array $data): OsaRecord

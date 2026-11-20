@@ -146,6 +146,9 @@ class _VisitPageState extends ConsumerState<VisitPage> {
     final form = ref.watch(formProvider(v.formId)).valueOrNull;
     final sales = ref.watch(itemsProvider((visitId: v.localId, kind: 'sale'))).valueOrNull?.length ?? 0;
     final osa = ref.watch(itemsProvider((visitId: v.localId, kind: 'osa'))).valueOrNull?.length ?? 0;
+    final orders = ref.watch(itemsProvider((visitId: v.localId, kind: 'order'))).valueOrNull?.length ?? 0;
+    final expiries = ref.watch(itemsProvider((visitId: v.localId, kind: 'expiry'))).valueOrNull?.length ?? 0;
+    final counts = ref.watch(itemsProvider((visitId: v.localId, kind: 'stockcount'))).valueOrNull?.length ?? 0;
     final merch = ref.watch(itemsProvider((visitId: v.localId, kind: 'merch'))).valueOrNull?.length ?? 0;
     final photos = ref.watch(photosProvider(v.localId)).valueOrNull ?? const <Map<String, Object?>>[];
     final stuck = ref.watch(stuckOpsProvider(v.localId)).valueOrNull ?? const [];
@@ -249,6 +252,9 @@ class _VisitPageState extends ConsumerState<VisitPage> {
         if (rules.taskOn('form')) task(Icons.fact_check_outlined, form?.name ?? 'Visit form', form == null ? 'No form for this $label' : formStats, 'form', enabled: checkedIn && form != null),
         if (rules.taskOn('sales')) task(Icons.attach_money, 'Sales', '$sales recorded', 'sales', enabled: checkedIn),
         if (rules.taskOn('osa')) task(Icons.inventory_2_outlined, 'On-shelf availability', '$osa product${osa == 1 ? '' : 's'} checked', 'osa', enabled: checkedIn),
+        if (rules.taskOn('orders')) task(Icons.shopping_cart_outlined, 'Orders', '$orders taken', 'orders', enabled: checkedIn),
+        if (rules.taskOn('stock_count')) task(Icons.inventory_outlined, 'Stock count', '$counts product${counts == 1 ? '' : 's'} counted', 'stockcount', enabled: checkedIn),
+        if (rules.taskOn('expiries')) task(Icons.event_busy_outlined, 'Expiries', '$expiries recorded', 'expiries', enabled: checkedIn),
         if (rules.taskOn('merchandising')) task(Icons.view_in_ar_outlined, 'Merchandising', '$merch record${merch == 1 ? '' : 's'}', 'merch', enabled: checkedIn),
         if (rules.taskOn('photos') || rules.minPhotos > 0)
           task(Icons.photo_camera_outlined, 'Photos & evidence',

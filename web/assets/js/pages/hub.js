@@ -1,6 +1,6 @@
 import { h } from '../core/dom.js';
 import { icon } from '../core/icons.js';
-import { canAny, hasFeature } from '../core/auth.js';
+import { canAny, hasFeature, isAdminRole } from '../core/auth.js';
 import { href } from '../core/router.js';
 import { pageHead } from '../ui/feedback.js';
 import { HUBS } from '../nav.js';
@@ -8,6 +8,7 @@ import { HUBS } from '../nav.js';
 /** A hub groups related pages under one menu item, each with a plain line on what it is for. */
 export default async function render({ container, params }) {
   const hub = HUBS[params.name];
+  if (hub && hub.adminOnly && !isAdminRole()) { container.append(pageHead({ title: 'Not available' }), h('p', { class: 'muted' }, 'This menu is for the Super Administrator and Agency only.')); return; }
   if (!hub) { container.append(pageHead({ title: 'Not found' }), h('p', { class: 'muted' }, 'That menu does not exist.')); return; }
   const sections = hub.sections.map((s) => ({ ...s, items: s.items.filter((i) => canAny(i.perm) && (!i.feature || hasFeature(i.feature))) })).filter((s) => s.items.length);
   container.append(pageHead({ title: hub.title, subtitle: hub.intro }));

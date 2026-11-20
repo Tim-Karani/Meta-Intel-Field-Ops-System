@@ -29,7 +29,7 @@ use Illuminate\Support\Facades\DB;
 final class ProjectSettings
 {
     public const SOURCES = ['journey_plan', 'pre_mapped', 'agent_adds', 'mixed'];
-    public const TASKS = ['form', 'sales', 'osa', 'merchandising', 'photos'];
+    public const TASKS = ['form', 'sales', 'orders', 'osa', 'stock_count', 'expiries', 'merchandising', 'photos'];
     public const EMPLOYMENT = ['permanent', 'reliever'];
     public const REVIEW = ['exceptions'];
     public const CAPTURE_GEO = ['office_only', 'first_visit'];
@@ -39,7 +39,7 @@ final class ProjectSettings
         'journey_plan' => false,
         // Sales are only for projects where the agent sells (sales reps, foot soldiers). Merchandising-type work reads
         // sales from the outlet's own records, so the tile is off unless a project turns it on.
-        'tasks' => ['form' => true, 'sales' => false, 'osa' => true, 'merchandising' => true, 'photos' => true],
+        'tasks' => ['form' => true, 'sales' => false, 'orders' => false, 'osa' => true, 'stock_count' => true, 'expiries' => true, 'merchandising' => true, 'photos' => true],
         'min_photos' => 0,
         'visit_photos' => true,
         'review' => 'exceptions',
@@ -56,7 +56,7 @@ final class ProjectSettings
             'description' => 'Permanent merchandisers follow a Fixed Journey Plan of outlets by weekday. Relievers can add the outlets they cover. Shelf, availability and photo work.',
             'settings' => [
                 'outlet_source' => 'journey_plan', 'journey_plan' => true,
-                'tasks' => ['form' => true, 'sales' => false, 'osa' => true, 'merchandising' => true, 'photos' => true],
+                'tasks' => ['form' => true, 'sales' => false, 'orders' => false, 'osa' => true, 'stock_count' => true, 'expiries' => true, 'merchandising' => true, 'photos' => true],
                 'min_photos' => 2, 'visit_label' => 'Visit', 'outlet_type' => 'supermarket', 'capture_geo' => 'office_only',
             ],
         ],
@@ -65,7 +65,7 @@ final class ProjectSettings
             'description' => 'Outlets are set up (and mapped) on the web. Agents only check in at them and run the activation: form, sales and photos.',
             'settings' => [
                 'outlet_source' => 'pre_mapped', 'journey_plan' => false,
-                'tasks' => ['form' => true, 'sales' => true, 'osa' => false, 'merchandising' => false, 'photos' => true],
+                'tasks' => ['form' => true, 'sales' => true, 'orders' => false, 'osa' => false, 'stock_count' => false, 'expiries' => false, 'merchandising' => false, 'photos' => true],
                 'min_photos' => 2, 'visit_label' => 'Activation', 'outlet_type' => 'retail_store', 'capture_geo' => 'office_only',
             ],
         ],
@@ -74,7 +74,7 @@ final class ProjectSettings
             'description' => 'Agents move between venues and add each stop as they arrive; its location is saved when they check in. Sales, form and photos.',
             'settings' => [
                 'outlet_source' => 'agent_adds', 'journey_plan' => false,
-                'tasks' => ['form' => true, 'sales' => true, 'osa' => false, 'merchandising' => false, 'photos' => true],
+                'tasks' => ['form' => true, 'sales' => true, 'orders' => false, 'osa' => false, 'stock_count' => false, 'expiries' => false, 'merchandising' => false, 'photos' => true],
                 'min_photos' => 3, 'visit_label' => 'Roadshow stop', 'outlet_type' => 'event_venue', 'capture_geo' => 'first_visit',
             ],
         ],
@@ -83,7 +83,7 @@ final class ProjectSettings
             'description' => 'Route-based selling and checks. Outlets come from the office or are added by agents in the field. Form, sales, availability and photos.',
             'settings' => [
                 'outlet_source' => 'mixed', 'journey_plan' => false,
-                'tasks' => ['form' => true, 'sales' => true, 'osa' => true, 'merchandising' => false, 'photos' => true],
+                'tasks' => ['form' => true, 'sales' => true, 'orders' => true, 'osa' => true, 'stock_count' => true, 'expiries' => true, 'merchandising' => false, 'photos' => true],
                 'min_photos' => 1, 'visit_label' => 'Visit', 'outlet_type' => 'retail_store', 'capture_geo' => 'first_visit',
             ],
         ],
@@ -92,7 +92,7 @@ final class ProjectSettings
             'description' => 'Agents are given stock and sell it. Sales are recorded at every stop and accounted for against the stock issued to them.',
             'settings' => [
                 'outlet_source' => 'mixed', 'journey_plan' => false,
-                'tasks' => ['form' => true, 'sales' => true, 'osa' => false, 'merchandising' => false, 'photos' => true],
+                'tasks' => ['form' => true, 'sales' => true, 'orders' => true, 'osa' => false, 'stock_count' => false, 'expiries' => false, 'merchandising' => false, 'photos' => true],
                 'min_photos' => 1, 'visit_label' => 'Stop', 'outlet_type' => 'retail_store', 'capture_geo' => 'first_visit',
             ],
         ],

@@ -105,6 +105,12 @@ class OutboxOp {
         return 'Sale';
       case 'visit_osa':
         return 'On-shelf availability';
+      case 'visit_order':
+        return 'Order';
+      case 'visit_expiry':
+        return 'Expiry';
+      case 'visit_stockcount':
+        return 'Stock count';
       case 'visit_merch':
         return 'Merchandising';
       case 'photo_upload':
